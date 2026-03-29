@@ -1,5 +1,6 @@
 """Main application window with tabbed interface and status bar."""
 import sys
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog
@@ -67,6 +68,7 @@ class App(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self._app_start_time = time.monotonic()
         self._game_install: GameInstallation | None = None
         self._module_instances: list = []
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
@@ -234,6 +236,7 @@ class App(ctk.CTk):
                 game_installation=self._game_install,
                 status_bar=self._status_bar,
                 content_frame=content,
+                app_start_time=self._app_start_time,
             )
             module.initialize(context)
             self._module_instances.append(module)

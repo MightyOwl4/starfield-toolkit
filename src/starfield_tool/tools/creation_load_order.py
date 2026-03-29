@@ -60,6 +60,10 @@ class CreationLoadOrderTool(ToolModule):
             top, text="Export", width=60, command=self._export, **_btn_kw,
         ).pack(side="left", padx=(0, 6))
 
+        ctk.CTkButton(
+            top, text="Clear Cache", width=80, command=self._clear_cache, **_btn_kw,
+        ).pack(side="left", padx=(0, 6))
+
         self._update_summary = ctk.CTkLabel(top, text="")
         self._update_summary.pack(side="left", padx=8)
 
@@ -199,14 +203,37 @@ class CreationLoadOrderTool(ToolModule):
 
     def _on_refresh_complete(self, creations):
         self._creations = creations
-        self._checked = False
-        self._achievements_checked = False
-        if self._update_summary:
-            self._update_summary.configure(text="")
-        if self._achiev_summary:
-            self._achiev_summary.configure(text="")
+        # Restore cached check state if within session window
+        self._restore_cached_state()
         self._populate_tree()
         self._context.status_bar.clear_task()
+
+    def _restore_cached_state(self):
+        """Reapply cached check results to the current creation list."""
+        from starfield_tool.creations import get_cached_info
+        from bethesda_creations._version_cmp import compare_versions
+
+        cached = get_cached_info(self._context.app_start_time)
+        if not cached:
+            self._checked = False
+            self._achievements_checked = False
+            if self._update_summary:
+                self._update_summary.configure(text="")
+            if self._achiev_summary:
+                self._achiev_summary.configure(text="")
+            return
+
+        for creation in self._creations:
+            info = cached.get(creation.content_id)
+            if not info:
+                continue
+            if info.version:
+                creation.available_version = info.version
+                creation.has_update = compare_versions(
+                    creation.installed_version, info.version
+                )
+            if info.achievement_friendly is not None:
+                creation.achievement_friendly = info.achievement_friendly
 
     def _on_refresh_error(self, message):
         self._show_error(message)
@@ -270,9 +297,10 @@ class CreationLoadOrderTool(ToolModule):
 
         def _run():
             try:
-                from starfield_tool.version_checker import check_for_updates
+                from starfield_tool.creations import check_for_updates
                 updated = check_for_updates(
-                    self._creations, self._context.status_bar
+                    self._creations, self._context.status_bar,
+                    self._context.app_start_time,
                 )
                 # Schedule UI update on the main thread
                 self._tree.after(0, lambda: self._on_updates_complete(updated))
@@ -333,9 +361,10 @@ class CreationLoadOrderTool(ToolModule):
 
         def _run():
             try:
-                from starfield_tool.version_checker import check_achievements
+                from starfield_tool.creations import check_achievements
                 updated = check_achievements(
-                    self._creations, self._context.status_bar
+                    self._creations, self._context.status_bar,
+                    self._context.app_start_time,
                 )
                 self._tree.after(0, lambda: self._on_achievements_complete(updated))
             except Exception:
@@ -383,6 +412,21 @@ class CreationLoadOrderTool(ToolModule):
                 self._tree.delete(item)
         self._empty_label.configure(text=f"Error: {message}")
         self._empty_label.pack(pady=20)
+
+    def _clear_cache(self):
+        """Delete all cached API responses."""
+        from starfield_tool.creations import clear_cache
+        clear_cache()
+        self._checked = False
+        self._achievements_checked = False
+        if self._update_summary:
+            self._update_summary.configure(text="")
+        if self._achiev_summary:
+            self._achiev_summary.configure(text="")
+        self._populate_tree()
+        if self._context:
+            self._context.status_bar.set_task("Cache cleared")
+            self._tree.after(2000, self._context.status_bar.clear_task)
 
     def _export(self):
         """Export the creation list as markdown table (.txt) or CSV."""
