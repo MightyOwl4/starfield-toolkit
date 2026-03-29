@@ -11,17 +11,6 @@ Starfield Toolkit is a lightweight Windows GUI to help managing official Bethesd
 The sole reason for its existence is that some operations are frustratingly non-user-friendly in-game and on the site, e.g. you have no other way to check for pending updates than walking through all creations in your library one by one.
 This toolbox tries to provide solutions to issues like this without messing with the game itself.
 
-## Tools
-
-### Installed Creations
-
-View all installed Bethesda Creations in their current load order. Features:
-
-- **Check for Updates** — compares your installed versions against the Bethesda Creations API and highlights outdated entries
-- **Check Achievements** — flags any creations that will disable achievements when active
-- **Export** — save your creation list as a markdown table or CSV
-- **Auto-refresh** — watches your Plugins.txt and ContentCatalog.txt for changes and prompts you to reload
-
 ## Download
 
 Grab the latest `StarfieldToolkit.exe` from [Releases](https://github.com/MightyOwl4/starfield-toolkit/releases/latest).
@@ -29,6 +18,30 @@ Grab the latest `StarfieldToolkit.exe` from [Releases](https://github.com/Mighty
 > **Downloading executables from unknown people is generally a bad idea!**
 >
 > Here, I warned you! :D The EXE file is automatically built by GitHub based on the (public) code in the repo, so unless someone hacks ME and compromises the repo, you should be safe. But ... :D
+
+If you prefer to install and compile yourself - look below
+
+## Tools
+
+### Installed Creations
+
+View all installed Bethesda Creations in their current load order. Features:
+
+#### Check for Updates
+compares your installed versions against the Bethesda Creations API and highlights outdated entries
+![check_for_updates.png](assets/check_for_updates.png)
+
+
+#### Check Achievements
+flags any creations that will disable achievements when active
+![check-achievement-diabling.png](assets/check-achievement-diabling.png)
+
+#### Export
+save your creation list as a markdown table or CSV, for sharing online
+
+#### Auto-refresh
+watches your Plugins.txt and ContentCatalog.txt for changes and prompts you to reload
+
 
 ## Project setup
 
