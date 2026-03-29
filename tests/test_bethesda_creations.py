@@ -1,4 +1,4 @@
-    """Tests for the bethesda_creations package."""
+"""Tests for the bethesda_creations package."""
 import json
 import time
 from pathlib import Path
