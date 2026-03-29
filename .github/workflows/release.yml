@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]*"
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build
+        shell: bash
+        run: bash bin/build.sh "${{ github.ref_name }}"
+
+      - name: Rename artifact
+        shell: bash
+        run: |
+          mv build/dist/StarfieldToolkit.exe "build/dist/StarfieldToolkit-${{ github.ref_name }}.exe"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "build/dist/StarfieldToolkit-${{ github.ref_name }}.exe"

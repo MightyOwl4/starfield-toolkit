@@ -1,0 +1,9 @@
+# This file is used by Starfield to determine plugin load order
+*Starfield.esm
+*BlueprintShips-Starfield.esm
+*OldMars.esm
+*Constellation.esm
+*SFBGS007.esm
+*SFBGS008.esm
+*SFBGS006.esm
+CreationClub01.esl

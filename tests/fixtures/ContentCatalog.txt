@@ -1,0 +1,30 @@
+{
+  "ContentCatalog": {
+    "Description": "This file holds a database of any Creations downloaded or installed, in JSON format",
+    "Version": "1.1"
+  },
+  "SFBGS007": {
+    "AchievementSafe": true,
+    "Files": ["SFBGS007.esm"],
+    "Title": "Vulture's Roost",
+    "Version": "1764942763.1.2.0"
+  },
+  "SFBGS008": {
+    "AchievementSafe": true,
+    "Files": ["SFBGS008.esm"],
+    "Title": "The Deslocked Bounty Hunter Pack",
+    "Version": "1721393644.2.0.1"
+  },
+  "SFBGS006": {
+    "AchievementSafe": true,
+    "Files": ["SFBGS006.esm", "SFBGS006 - Textures.ba2"],
+    "Title": "Starborn Gravis Suit",
+    "Version": "1.0.0"
+  },
+  "CC01": {
+    "AchievementSafe": false,
+    "Files": ["CreationClub01.esl"],
+    "Title": "Missing Plugin Creation",
+    "Version": "1.0.0"
+  }
+}
