@@ -53,6 +53,22 @@ make build
 
 Produces `build/dist/StarfieldToolkit.exe` via PyInstaller.
 
+
+## AI usage disclosure
+
+### App log
+
+Logo is produced by Midjourney, using the following prompt:
+
+> Minimalist app icon design, a mechanic wrench lying horizontally centered inside a thin white circular ring with a small gaps at left and right side (Starfield logo circle style), the wrench handle and left half of the head painted with vintage retro racing stripes in red orange yellow blue and cyan running along its length, right side plain brushed metal, solid dark space navy background, clean vector icon style, no gradients, square format
+>
+This project has no budget to commission an artist, however anyone willing to contribute a decent human-made one is more than welcome.
+
+
+### Code
+
+Produced mostly by Anthropic's Opus 4.6, using spec-driven development approach, and passing code review to ensure there are no (major) flops.
+
 ## License
 
 See [LICENSE](LICENSE) for details (but It's MIT, so why bother)
