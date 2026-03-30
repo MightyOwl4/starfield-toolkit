@@ -8,7 +8,7 @@ from bethesda_creations.models import CreationInfo
 CACHE_VERSION = 1
 
 # Fields that never change once a Creation is published.
-_IMMUTABLE_FIELDS = {"author", "achievement_friendly", "categories", "thumbnail_url"}
+_IMMUTABLE_FIELDS = {"title", "description", "author", "achievement_friendly", "categories", "thumbnail_url"}
 
 
 def load_cache(path: Path) -> dict[str, dict]:
@@ -51,6 +51,8 @@ def info_to_entry(info: CreationInfo) -> dict:
     """Convert a CreationInfo to a cache entry dict."""
     return {
         "fetched_at": time.time(),
+        "title": info.title,
+        "description": info.description,
         "author": info.author,
         "achievement_friendly": info.achievement_friendly,
         "categories": info.categories,
@@ -66,6 +68,8 @@ def info_to_entry(info: CreationInfo) -> dict:
 def entry_to_info(entry: dict) -> CreationInfo:
     """Convert a cache entry dict to a CreationInfo."""
     return CreationInfo(
+        title=entry.get("title"),
+        description=entry.get("description"),
         version=entry.get("version"),
         author=entry.get("author"),
         price=entry.get("price", 0),

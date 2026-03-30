@@ -60,10 +60,6 @@ class CreationLoadOrderTool(ToolModule):
             top, text="Export", width=60, command=self._export, **_btn_kw,
         ).pack(side="left", padx=(0, 6))
 
-        ctk.CTkButton(
-            top, text="Clear Cache", width=80, command=self._clear_cache, **_btn_kw,
-        ).pack(side="left", padx=(0, 6))
-
         self._update_summary = ctk.CTkLabel(top, text="")
         self._update_summary.pack(side="left", padx=8)
 
@@ -413,20 +409,6 @@ class CreationLoadOrderTool(ToolModule):
         self._empty_label.configure(text=f"Error: {message}")
         self._empty_label.pack(pady=20)
 
-    def _clear_cache(self):
-        """Delete all cached API responses."""
-        from starfield_tool.creations import clear_cache
-        clear_cache()
-        self._checked = False
-        self._achievements_checked = False
-        if self._update_summary:
-            self._update_summary.configure(text="")
-        if self._achiev_summary:
-            self._achiev_summary.configure(text="")
-        self._populate_tree()
-        if self._context:
-            self._context.status_bar.set_task("Cache cleared")
-            self._tree.after(2000, self._context.status_bar.clear_task)
 
     def _export(self):
         """Export the creation list as markdown table (.txt) or CSV."""

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 @dataclass
 class CreationInfo:
     """Metadata for a single Bethesda Creation."""
+    title: str | None = None
+    description: str | None = None
     version: str | None = None
     author: str | None = None
     price: int = 0  # 0 = free, >0 = Creations credits

@@ -20,19 +20,12 @@ class TestParseResponse:
                     "author_displayname": "SomeAuthor",
                     "achievement_friendly": True,
                     "categories": ["Gear", "Lore Friendly", "Quests"],
-                    "release_notes": [
-                        {
-                            "hardware_platform": "WINDOWS",
-                            "release_notes": [
-                                {"version_name": "1.2.3"}
-                            ],
-                        }
-                    ],
                     "download": [
                         {
                             "hardware_platform": "WINDOWS",
                             "published": [
                                 {
+                                    "version_name": "1.2.3",
                                     "client": {
                                         "_slot": {"size": 125829120}
                                     }
@@ -70,10 +63,10 @@ class TestParseResponse:
                     "author_displayname": "ModderName",
                     "achievement_friendly": False,
                     "categories": [],
-                    "release_notes": [
+                    "download": [
                         {
                             "hardware_platform": "WINDOWS",
-                            "release_notes": [
+                            "published": [
                                 {"version_name": "2.0"}
                             ],
                         }
