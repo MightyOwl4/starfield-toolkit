@@ -5,20 +5,41 @@ SORTER_NAME = "CAT"
 PRIORITY = 10  # lowest priority sorter
 
 # Mapping from Bethesda API category names to community tier numbers.
+# Mapping from Bethesda API category names to community tier numbers.
+# "Load Order Neutral" and "Lore Friendly" are meta-tags (not placement
+# hints) and intentionally unmapped — the content category determines tier.
 _CATEGORY_TO_TIER: dict[str, int] = {
+    # Tier 3 — Invasive World Edits
     "Overhaul": 3,
     "Quests": 3,
     "Dungeons": 3,
+    "World": 3,
+    "Planets": 3,
+    "Creatures": 3,
+    # Tier 4 — Workshop
     "Outpost": 4,
+    # Tier 5 — Gameplay Changes
     "Gameplay": 5,
     "Immersion": 5,
+    # Tier 6 — Companions
+    "Followers": 6,
+    # Tier 7 — Audio / Visual
     "Visuals": 7,
+    "Environmental": 7,
+    # Tier 8 — HUD / UI
+    "UI": 8,
+    # Tier 9 — Ship Additions / Default
+    "Ships": 9,
+    "Miscellaneous": 9,
+    # Tier 10 — Character Wearables
     "Gear": 10,
     "Weapons": 10,
     "Apparel": 10,
+    "Skins": 10,
+    "Body": 10,
+    # Tier 11 — Non-Invasive World Edits
     "Homes": 11,
     "Vehicles": 11,
-    "Miscellaneous": 9,
     "Cheats": 11,
 }
 
@@ -47,10 +68,10 @@ def _resolve_tier(item: SortItem) -> int:
     # Official Bethesda creations always tier 1
     if item.content_id.startswith("SFBGS") or item.author in _BETHESDA_AUTHORS:
         return 1
-    # Use the highest-priority (lowest-numbered) tier from categories
-    best = DEFAULT_TIER
-    for cat in item.categories:
-        tier = _CATEGORY_TO_TIER.get(cat)
-        if tier is not None and tier < best:
-            best = tier
-    return best
+    # Use the highest-priority (lowest-numbered) tier from mapped categories
+    matched = [
+        _CATEGORY_TO_TIER[cat]
+        for cat in item.categories
+        if cat in _CATEGORY_TO_TIER
+    ]
+    return min(matched) if matched else DEFAULT_TIER
