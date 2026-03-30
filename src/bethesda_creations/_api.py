@@ -44,36 +44,42 @@ def search_uuid_by_title(client: httpx.Client, title: str) -> str | None:
     return None
 
 
+def _get_platform_data(entries: list, platform: str = "WINDOWS") -> dict | None:
+    """Find the entry for a specific platform in a list of per-platform dicts."""
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("hardware_platform") == platform:
+            return entry
+    return None
+
+
 def parse_response(data: dict) -> CreationInfo:
     """Parse a Creations API JSON response into CreationInfo."""
     resp = data.get("platform", {}).get("response", {})
     info = CreationInfo()
 
+    info.title = resp.get("title")
+    info.description = resp.get("description")
     info.author = resp.get("author_displayname")
     info.achievement_friendly = resp.get("achievement_friendly", False)
     info.categories = resp.get("categories", [])
 
-    # Version from release_notes (per-platform, prefer WINDOWS)
-    for platform_notes in resp.get("release_notes", []):
-        if platform_notes.get("hardware_platform") == "WINDOWS":
-            notes = platform_notes.get("release_notes", [])
-            if notes:
-                info.version = notes[0].get("version_name")
-            break
-
-    # Installation size from download info (WINDOWS platform)
-    for platform_dl in resp.get("download", []):
-        if platform_dl.get("hardware_platform") == "WINDOWS":
-            for pub in platform_dl.get("published", []):
-                for _slot, slot_data in pub.get("client", {}).items():
-                    size_bytes = slot_data.get("size", 0)
-                    if size_bytes >= 1_073_741_824:
-                        info.installation_size = f"{size_bytes / 1_073_741_824:.2f} GB"
-                    elif size_bytes > 0:
-                        info.installation_size = f"{size_bytes / 1_048_576:.2f} MB"
-                    break
+    # Version and size from download (published binaries) — WINDOWS only.
+    # The download field is the authoritative per-platform source.
+    # release_notes are shared across platforms and can be misleading.
+    windows_dl = _get_platform_data(resp.get("download", []), "WINDOWS")
+    if windows_dl:
+        published = windows_dl.get("published", [])
+        if published:
+            # First entry is the latest published version
+            latest = published[0]
+            info.version = latest.get("version_name")
+            for _slot, slot_data in latest.get("client", {}).items():
+                size_bytes = slot_data.get("size", 0)
+                if size_bytes >= 1_073_741_824:
+                    info.installation_size = f"{size_bytes / 1_073_741_824:.2f} GB"
+                elif size_bytes > 0:
+                    info.installation_size = f"{size_bytes / 1_048_576:.2f} MB"
                 break
-            break
 
     # Dates from unix timestamps
     if resp.get("first_ptime"):

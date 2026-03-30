@@ -8,7 +8,7 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 from starfield_tool.base import ModuleContext
-from starfield_tool.config import load_config, save_config, AppSettings
+from starfield_tool.config import load_config, save_config
 from starfield_tool.models import GameInstallation
 from starfield_tool.status_bar import StatusBar
 from starfield_tool.tools import MODULES
@@ -25,24 +25,19 @@ def _icon_path() -> Path:
 CONSTELLATION_COLORS = ["#314c79", "#dba54b", "#e26137", "#c92337"]
 
 
-def _create_constellation_stripe(parent, height: int = 4) -> tk.Canvas:
-    """Create the Constellation faction stripe as a thin canvas bar."""
-    canvas = tk.Canvas(
-        parent, height=height, highlightthickness=0, bd=0,
-    )
-    colors = CONSTELLATION_COLORS
-    band_count = len(colors)
+def _create_constellation_stripe(parent, band_height: int = 4) -> tk.Frame:
+    """Create the Constellation faction stripe as stacked Frame bands.
 
-    def _draw(event=None):
-        canvas.delete("all")
-        w = canvas.winfo_width() or 1
-        band_h = height / band_count
-        for i, color in enumerate(colors):
-            y0 = i * band_h
-            canvas.create_rectangle(0, y0, w, y0 + band_h + 1, fill=color, outline="")
-
-    canvas.bind("<Configure>", _draw)
-    return canvas
+    band_height is the exact pixel height of each color band.
+    Uses one Frame per color to avoid Canvas coordinate rounding
+    issues with DPI scaling.
+    """
+    container = tk.Frame(parent, highlightthickness=0, bd=0)
+    for color in CONSTELLATION_COLORS:
+        band = tk.Frame(container, bg=color, height=band_height)
+        band.pack(fill="x")
+        band.pack_propagate(False)
+    return container
 
 
 class App(ctk.CTk):
@@ -94,8 +89,26 @@ class App(ctk.CTk):
         # Leading spacer
         tk.Frame(self._tab_bar, width=8, bg=self._bg_color).pack(side="left")
 
+        # Settings menu — right side of tab bar
+        _dim_border = "#555555" if is_dark else "#aaaaaa"
+        self._menu_btn = ctk.CTkButton(
+            self._tab_bar,
+            text="\u22ee",
+            width=28, height=28,
+            corner_radius=4,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#ffffff",
+            fg_color=self._bg_color,
+            hover_color=_dim_border,
+            border_width=1,
+            border_color=self._bg_color,
+            command=lambda: self._show_settings_menu(None),
+        )
+        self._menu_btn.pack(side="right", padx=(0, 4))
+        self._menu_btn.bind("<Button-1>", self._show_settings_menu)
+
         # Stripe between tab bar and content
-        self._stripe_top = _create_constellation_stripe(self, height=20)
+        self._stripe_top = _create_constellation_stripe(self, band_height=5)
         self._stripe_top.pack(fill="x", side="top", padx=8, pady=0)
 
         self._tab_labels: dict[str, ctk.CTkLabel] = {}
@@ -123,6 +136,8 @@ class App(ctk.CTk):
             label.pack(padx=2, pady=(2, 0))  # border effect: top/left/right
             label.bind("<Button-1>", lambda e, n=tab_name: self._select_tab(n))
             wrapper.bind("<Button-1>", lambda e, n=tab_name: self._select_tab(n))
+            label.bind("<Enter>", lambda e, n=tab_name: self._on_tab_hover(n, True))
+            label.bind("<Leave>", lambda e, n=tab_name: self._on_tab_hover(n, False))
 
             self._tab_labels[tab_name] = label
             self._tab_wrappers[tab_name] = wrapper
@@ -137,6 +152,13 @@ class App(ctk.CTk):
 
         # Run startup detection
         self.after(100, self._startup)
+
+    def _on_tab_hover(self, tab_name: str, entering: bool):
+        """Highlight inactive tab text on hover."""
+        if tab_name == self._active_tab:
+            return
+        label = self._tab_labels[tab_name]
+        label.configure(fg="#ffffff" if entering else self._inactive_fg)
 
     def _select_tab(self, tab_name: str):
         """Switch to the given tab."""
@@ -159,9 +181,21 @@ class App(ctk.CTk):
         self._active_tab = tab_name
 
     def _startup(self):
-        """Startup flow: config → auto-detect → dialog → skeleton."""
-        self._status_bar.set_task("Checking configuration...")
+        """Startup flow: beta warning → config → auto-detect → dialog → skeleton."""
         settings = load_config()
+
+        if not settings.beta_acknowledged:
+            from tkinter import messagebox
+            messagebox.showwarning(
+                "Beta Software",
+                "Starfield Toolkit is in early development and lightly tested.\n\n"
+                "Please back up your Plugins.txt before making load order changes.\n\n"
+                "Use at your own risk.",
+            )
+            settings.beta_acknowledged = True
+            save_config(settings)
+
+        self._status_bar.set_task("Checking configuration...")
 
         # Try persisted path first
         if settings.game_path:
@@ -201,7 +235,9 @@ class App(ctk.CTk):
     def _on_game_found(self, install: GameInstallation):
         """Game path resolved — persist config and initialize modules."""
         self._game_install = install
-        save_config(AppSettings(game_path=str(install.game_root)))
+        settings = load_config()
+        settings.game_path = str(install.game_root)
+        save_config(settings)
         self._status_bar.set_game_path(str(install.game_root))
         self._status_bar.set_task("Initializing modules...")
         self._initialize_modules()
@@ -300,6 +336,59 @@ class App(ctk.CTk):
             pass
         self._status_bar.set_task("Auto-detection failed")
         self.after(3000, self._status_bar.clear_task)
+
+    # --- Settings menu ---
+
+    def _show_settings_menu(self, event=None):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Change game path...", command=self._settings_change_path)
+        menu.add_command(label="Clear creations cache", command=self._settings_clear_cache)
+        menu.add_separator()
+        menu.add_command(label="About", command=self._settings_about)
+        # Position below the button
+        x = self._menu_btn.winfo_rootx()
+        y = self._menu_btn.winfo_rooty() + self._menu_btn.winfo_height()
+        menu.tk_popup(x, y)
+
+    def _settings_change_path(self):
+        from tkinter import messagebox
+        path = filedialog.askdirectory(
+            title="Select Starfield installation folder",
+        )
+        if not path:
+            return
+        install = GameInstallation(game_root=Path(path), source="manual")
+        if not install.is_valid:
+            messagebox.showerror(
+                "Invalid Path",
+                f"{path} does not appear to be a valid Starfield installation.",
+            )
+            return
+        settings = load_config()
+        settings.game_path = str(install.game_root)
+        save_config(settings)
+        self._game_install = install
+        self._status_bar.set_game_path(str(install.game_root))
+        self._status_bar.set_task("Game path updated — restart to reload modules")
+        self.after(3000, self._status_bar.clear_task)
+
+    def _settings_clear_cache(self):
+        from starfield_tool.creations import clear_cache
+        clear_cache()
+        self._status_bar.set_task("Cache cleared")
+        self.after(2000, self._status_bar.clear_task)
+
+    def _settings_about(self):
+        from tkinter import messagebox
+        from starfield_tool import __version__
+        ver = __version__ if __version__ else "development version"
+        messagebox.showinfo(
+            "About Starfield Toolkit",
+            f"Starfield Toolkit — {ver}\n\n"
+            "https://github.com/MightyOwl4/starfield-toolkit\n\n"
+            "A lightweight tool for managing Bethesda Creations\n"
+            "in Starfield — load order, updates, and achievements.",
+        )
 
     def _on_close(self):
         """Save window geometry and close."""
