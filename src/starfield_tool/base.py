@@ -15,6 +15,7 @@ class ModuleContext:
     game_installation: GameInstallation
     status_bar: StatusBarAPI
     content_frame: object  # customtkinter frame, kept generic for testability
+    app_start_time: float = 0.0  # time.monotonic() at app startup
 
 
 class ToolModule(ABC):

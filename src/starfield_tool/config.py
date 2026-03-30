@@ -13,6 +13,7 @@ def _config_path() -> Path:
 class AppSettings:
     game_path: str | None = None
     window_geometry: str | None = None
+    beta_acknowledged: bool = False
 
 
 def load_config(path: Path | None = None) -> AppSettings:
@@ -22,6 +23,7 @@ def load_config(path: Path | None = None) -> AppSettings:
         return AppSettings(
             game_path=data.get("game_path"),
             window_geometry=data.get("window_geometry"),
+            beta_acknowledged=data.get("beta_acknowledged", False),
         )
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return AppSettings()

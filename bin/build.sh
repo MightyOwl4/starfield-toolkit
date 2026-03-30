@@ -27,6 +27,20 @@ if ! uv run python -c "import PyInstaller" 2>/dev/null; then
     uv pip install pyinstaller
 fi
 
+# Download LOOT masterlist for bundling
+LOOT_MASTERLIST="$BUILD_ROOT\\loot_masterlist.yaml"
+echo "Downloading LOOT Starfield masterlist..."
+curl -sL "https://raw.githubusercontent.com/loot/starfield/v0.21/masterlist.yaml" \
+    -o "$LOOT_MASTERLIST" || echo "Warning: Failed to download LOOT masterlist"
+
+LOOT_DATA_FLAG=""
+if [ -f "$LOOT_MASTERLIST" ]; then
+    LOOT_DATA_FLAG="--add-data ${LOOT_MASTERLIST}${PATHSEP}data"
+    echo "LOOT masterlist bundled."
+else
+    echo "Warning: Building without LOOT masterlist."
+fi
+
 echo "Running PyInstaller..."
 uv run pyinstaller \
     --onefile \
@@ -39,6 +53,7 @@ uv run pyinstaller \
     --add-data "$PROJECT_ROOT\\assets\\icon.ico${PATHSEP}assets" \
     --hidden-import _version \
     --add-data "$PROJECT_ROOT\\_version.py${PATHSEP}." \
+    $LOOT_DATA_FLAG \
     "$PROJECT_ROOT\\src\\starfield_tool\\__main__.py"
 
 echo "=== Build complete: $DIST_DIR\\StarfieldToolkit.exe ==="
