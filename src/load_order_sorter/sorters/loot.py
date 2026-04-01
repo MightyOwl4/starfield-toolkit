@@ -9,17 +9,19 @@ SORTER_NAME = "LOOT"
 PRIORITY = 20  # higher than category sorter
 
 # Map LOOT group names to community tier numbers.
+# "Bethesda Game Studios Creations" and "Trackers Alliance" are omitted
+# so those plugins fall through to the category sorter, which places them
+# by their content categories (skins, quests, ships, etc.) rather than
+# pinning all BGS marketplace items to tier 1.
 _GROUP_TO_TIER: dict[str, int] = {
     "Main Plugins": 1,
-    "Bethesda Game Studios Creations": 1,
-    "Trackers Alliance": 1,
     "Fixes & Resources": 2,
     "Early Loaders": 2,
     "Verified Creations": 3,
+    "High Priority Overrides": 3,
+    "Core Mods": 5,
     "default": 9,
     "Low Priority Overrides": 10,
-    "Core Mods": 5,
-    "High Priority Overrides": 3,
     "Late Loaders": 11,
     "Dynamic Patches": 11,
     "Late Fixes & Changes": 11,
@@ -49,24 +51,42 @@ def sort(
     constraints: list[SortConstraint] = []
     plugin_names = {item.plugin_name.lower(): item.plugin_name for item in items}
 
+    # Groups to skip — let the category sorter handle these instead
+    _SKIP_TIER_GROUPS = {
+        "Bethesda Game Studios Creations",
+        "Trackers Alliance",
+    }
+
     for lower_name, original_name in plugin_names.items():
         meta = plugin_meta.get(lower_name)
         if not meta:
             continue
 
-        # Tier from group assignment
         group = meta.get("group", "default")
-        tier = group_tiers.get(group, DEFAULT_TIER)
         warnings = meta.get("warnings", [])
 
-        constraints.append(SortConstraint(
-            plugin_name=original_name,
-            type="tier",
-            tier=tier,
-            sorter_name=SORTER_NAME,
-            priority=PRIORITY,
-            warnings=warnings,
-        ))
+        # Only emit a tier constraint if the group is in our map
+        # and not in the skip set (those fall through to category sorter)
+        if group not in _SKIP_TIER_GROUPS:
+            tier = group_tiers.get(group, DEFAULT_TIER)
+            constraints.append(SortConstraint(
+                plugin_name=original_name,
+                type="tier",
+                tier=tier,
+                sorter_name=f"{SORTER_NAME}({tier})",
+                priority=PRIORITY,
+                warnings=warnings,
+            ))
+        elif warnings:
+            # Still surface warnings even when tier is skipped
+            constraints.append(SortConstraint(
+                plugin_name=original_name,
+                type="tier",
+                tier=None,
+                sorter_name=SORTER_NAME,
+                priority=0,  # won't win tier resolution
+                warnings=warnings,
+            ))
 
         # Load-after constraints
         for after_name in meta.get("after", []):

@@ -55,19 +55,17 @@ def sort(items: list[SortItem]) -> list[SortConstraint]:
             plugin_name=item.plugin_name,
             type="tier",
             tier=tier,
-            sorter_name=SORTER_NAME,
+            sorter_name=f"{SORTER_NAME}({tier})",
             priority=PRIORITY,
         ))
     return constraints
 
 
-_BETHESDA_AUTHORS = {"BethesdaGameStudios", "Bethesda Game Studios"}
-
-
 def _resolve_tier(item: SortItem) -> int:
-    # Official Bethesda creations always tier 1
-    if item.content_id.startswith("SFBGS") or item.author in _BETHESDA_AUTHORS:
-        return 1
+    # All creations sort by their content categories.  Base-game master
+    # files (SFBGS prefix) never appear in the creation list — they are
+    # filtered out by the parser — so no special-casing is needed here.
+    #
     # Use the highest-priority (lowest-numbered) tier from mapped categories
     matched = [
         _CATEGORY_TO_TIER[cat]

@@ -104,11 +104,6 @@ class CreationLoadOrderTool(ToolModule):
         self._achiev_summary = ctk.CTkLabel(top, text="")
         self._achiev_summary.pack(side="left", padx=8)
 
-        self._outdated_label = ctk.CTkLabel(
-            top, text="", text_color="orange"
-        )
-        self._outdated_label.pack(side="right", padx=8)
-
         self._mode_toggle = ctk.CTkSegmentedButton(
             top, values=["List", "Media"],
             command=self._on_mode_toggle,
@@ -116,6 +111,11 @@ class CreationLoadOrderTool(ToolModule):
         )
         self._mode_toggle.set("List")
         self._mode_toggle.pack(side="right", padx=8)
+
+        self._outdated_label = ctk.CTkLabel(
+            top, text="", text_color="orange"
+        )
+        self._outdated_label.pack(side="right", padx=8)
 
         # Theme detection
         is_dark = ctk.get_appearance_mode() == "Dark"

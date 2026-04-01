@@ -365,11 +365,11 @@ class LoadOrderTool(ToolModule):
 
         def _run():
             from load_order_sorter import sort_creations, SortItem
-            from starfield_tool.creations import get_cached_info, _make_client
+            from starfield_tool.creations import get_cached_info_any, _make_client
             from bethesda_creations import ContentQuery
 
-            # Try cache first; if empty, fetch from API
-            cached = get_cached_info(self._context.app_start_time)
+            # Use any cached data (categories are immutable, freshness irrelevant)
+            cached = get_cached_info_any()
             if not cached:
                 self._context.status_bar.set_task(
                     "Fetching creation info for sorting..."
