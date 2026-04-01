@@ -98,6 +98,20 @@ def get_cached_info(app_start_time: float = 0.0) -> dict[str, CreationInfo]:
     return {cid: entry_to_info(entry) for cid, entry in cache.items()}
 
 
+def get_cached_info_any() -> dict[str, CreationInfo]:
+    """Return all cached creation info regardless of session freshness.
+
+    Useful for reading immutable fields (author, description, etc.)
+    that never change after publish.  Returns empty dict if the cache
+    file is missing or corrupt.
+    """
+    from bethesda_creations._cache import load_cache, entry_to_info
+    cache = load_cache(_CACHE_FILE)
+    if not cache:
+        return {}
+    return {cid: entry_to_info(entry) for cid, entry in cache.items()}
+
+
 def clear_cache() -> None:
     """Delete all cached API responses."""
     client = CreationsClient(ClientConfig(cache_path=_CACHE_FILE))

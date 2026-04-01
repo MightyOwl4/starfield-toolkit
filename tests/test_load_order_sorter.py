@@ -23,10 +23,11 @@ def _item(name, content_id="", categories=None, index=0, author=""):
 
 
 class TestCategorySorter:
-    def test_sfbgs_gets_tier1(self):
+    def test_sfbgs_no_special_tier(self):
+        """SFBGS prefix no longer gets special tier-1 treatment."""
         items = [_item("SFBGS006.esm", "SFBGS006")]
         constraints = category_sort(items)
-        assert constraints[0].tier == 1
+        assert constraints[0].tier == 9  # default — no categories mapped
 
     def test_quest_category_gets_tier3(self):
         items = [_item("mod.esm", "TM_abc", categories=["Quests"])]
@@ -49,10 +50,18 @@ class TestCategorySorter:
         constraints = category_sort(items)
         assert constraints[0].tier == 9
 
-    def test_bethesda_author_gets_tier1(self):
-        items = [_item("mod.esm", "TM_abc", author="BethesdaGameStudios")]
+    def test_bethesda_author_sorts_by_category(self):
+        """BGS marketplace creations sort by content category, not tier 1."""
+        items = [_item("mod.esm", "TM_abc", author="BethesdaGameStudios",
+                        categories=["Skins"])]
         constraints = category_sort(items)
-        assert constraints[0].tier == 1
+        assert constraints[0].tier == 10  # Skins tier, not pinned to 1
+
+    def test_sfbgs_prefix_gets_default_tier(self):
+        """SFBGS items without categories get the default tier (not special-cased)."""
+        items = [_item("Starfield.esm", "SFBGS001")]
+        constraints = category_sort(items)
+        assert constraints[0].tier == 9  # default, no special tier-1 override
 
 
 class TestLootSorter:
@@ -183,19 +192,19 @@ class TestSortCreations:
     def test_end_to_end_category_only(self):
         items = [
             _item("gear.esm", "TM_1", ["Gear"], 0),
-            _item("bgs.esm", "SFBGS006", [], 1),
+            _item("misc.esm", "TM_3", [], 1),
             _item("quest.esm", "TM_2", ["Quests"], 2),
         ]
         result = sort_creations(items, sorters=["category"])
         names = [si.plugin_name for si in result.items]
-        # BGS tier1, quest tier3, gear tier10
-        assert names == ["bgs.esm", "quest.esm", "gear.esm"]
+        # quest tier3, misc default tier9, gear tier10
+        assert names == ["quest.esm", "misc.esm", "gear.esm"]
         assert not result.unchanged
 
     def test_unchanged_order(self):
         items = [
-            _item("bgs.esm", "SFBGS006", [], 0),
-            _item("quest.esm", "TM_1", ["Quests"], 1),
+            _item("quest.esm", "TM_1", ["Quests"], 0),
+            _item("misc.esm", "TM_3", [], 1),
             _item("gear.esm", "TM_2", ["Gear"], 2),
         ]
         result = sort_creations(items, sorters=["category"])
@@ -222,7 +231,7 @@ class TestSortCreations:
         assert names == ["other.esm", "mod.esm"]
         # Verify attribution
         mod_item = [si for si in result.items if si.plugin_name == "mod.esm"][0]
-        assert mod_item.decision.sorter_name == "LOOT"
+        assert mod_item.decision.sorter_name == "LOOT(11)"
 
 
 class TestSnapshot:

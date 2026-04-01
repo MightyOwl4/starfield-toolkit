@@ -29,12 +29,14 @@ View all installed Bethesda Creations in their current load order. Features:
 
 ### Check for Updates
 compares your installed versions against the Bethesda Creations API and highlights outdated entries
-![check_for_updates.png](assets/check_for_updates.png)
+
+<img src="assets/check_for_updates.png" width="500" />
 
 
 ### Check Achievements
 flags any creations that will disable achievements when active
-![check-achievement-diabling.png](assets/check-achievement-diabling.png)
+
+<img src="assets/check-achievement-diabling.png" width="500" />
 
 ### Export
 save your creation list as a markdown table or CSV, for sharing online
@@ -49,14 +51,16 @@ Manage your plugin load order with safety and confidence.
 
 ### Drag-and-Drop Reordering
 Rearrange creations manually — changes are staged (highlighted) until you explicitly apply them. Plugins.txt is never written by accident.
-![load_order_drag.png](assets/load_order_drag.png)
+
+<img src="assets/load_order_drag.png" width="500" />
 
 ### Auto Sort
 One-click sorting using a priority-based pipeline: category-based rules (11-tier community system) combined with LOOT masterlist data. When sorters disagree, the more authoritative source wins.
 
 ### Review & Approve
 Git-merge-style diff view showing current vs proposed order side-by-side. Each moved item shows where it came from and which sorter decided the move (LOOT, CAT). Accept or ignore individual moves before applying.
-![load_order_diff.png](assets/load_order_diff.png)
+
+<img src="assets/load_order_diff.png" width="500" />
 
 ### Snapshots
 Save and restore named load order configurations. Useful for switching between setups (e.g., achievement-friendly vs full mods) or as a backup before experimenting.
