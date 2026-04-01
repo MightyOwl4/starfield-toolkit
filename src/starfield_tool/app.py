@@ -343,6 +343,7 @@ class App(ctk.CTk):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Change game path...", command=self._settings_change_path)
         menu.add_command(label="Clear creations cache", command=self._settings_clear_cache)
+        menu.add_command(label="Clear image cache", command=self._settings_clear_image_cache)
         menu.add_separator()
         menu.add_command(label="About", command=self._settings_about)
         # Position below the button
@@ -376,6 +377,16 @@ class App(ctk.CTk):
         from starfield_tool.creations import clear_cache
         clear_cache()
         self._status_bar.set_task("Cache cleared")
+        self.after(2000, self._status_bar.clear_task)
+
+    def _settings_clear_image_cache(self):
+        from starfield_tool.dialogs.image_cache import clear_image_cache
+        clear_image_cache()
+        # Also clear in-memory thumbnail caches in modules
+        for module in self._module_instances:
+            if hasattr(module, "_thumbnail_cache"):
+                module._thumbnail_cache.clear()
+        self._status_bar.set_task("Image cache cleared")
         self.after(2000, self._status_bar.clear_task)
 
     def _settings_about(self):
