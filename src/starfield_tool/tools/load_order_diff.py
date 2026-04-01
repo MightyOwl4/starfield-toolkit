@@ -28,6 +28,11 @@ class DiffDialog(ctk.CTkToplevel):
         self.attributes("-topmost", True)
         self.after(100, lambda: self.attributes("-topmost", False))
 
+        from starfield_tool.app import _icon_path
+        icon = _icon_path()
+        if icon.exists():
+            self.after(200, lambda: self.iconbitmap(str(icon)))
+
         self.result: list[str] | None = None
         self._current = current
         self._proposed = proposed
