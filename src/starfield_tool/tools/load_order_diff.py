@@ -21,8 +21,10 @@ class DiffDialog(ctk.CTkToplevel):
     ):
         super().__init__(parent)
         self.title("Review Proposed Load Order")
-        self.geometry("900x600")
         self.minsize(800, 400)
+
+        from starfield_tool.dialogs import center_dialog
+        center_dialog(self, 900, 600)
         # No transient/grab_set — those break Win+D recovery on Windows.
         # Show as a regular taskbar window so Alt+Tab always works.
         self.attributes("-topmost", True)

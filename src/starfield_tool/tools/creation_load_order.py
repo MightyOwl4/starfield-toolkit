@@ -55,6 +55,9 @@ class CreationLoadOrderTool(ToolModule):
         self._tree_frame: tk.Frame | None = None
         self._mode_toggle: ctk.CTkSegmentedButton | None = None
         self._fetching_cache: bool = False
+        self._font_title: ctk.CTkFont | None = None
+        self._font_small: ctk.CTkFont | None = None
+        self._font_desc: ctk.CTkFont | None = None
 
     def initialize(self, context: ModuleContext) -> None:
         self._context = context
@@ -93,16 +96,23 @@ class CreationLoadOrderTool(ToolModule):
             top, text="Export", width=60, command=self._export, **_btn_kw,
         ).pack(side="left", padx=(0, 6))
 
-        self._details_btn = ctk.CTkButton(
-            top, text="Details", width=60, command=self._show_details, **_btn_kw,
-        )
-        self._details_btn.pack(side="left", padx=(0, 6))
-
         self._update_summary = ctk.CTkLabel(top, text="")
-        self._update_summary.pack(side="left", padx=8)
+        self._update_summary.pack(side="left", padx=(8, 0))
+
+        self._update_clear = ctk.CTkLabel(
+            top, text="clear", font=ctk.CTkFont(size=11, underline=True),
+            text_color="#6699cc", cursor="hand2",
+        )
+        self._update_clear.bind("<Button-1>", lambda _e: self._clear_update_check())
 
         self._achiev_summary = ctk.CTkLabel(top, text="")
-        self._achiev_summary.pack(side="left", padx=8)
+        self._achiev_summary.pack(side="left", padx=(8, 0))
+
+        self._achiev_clear = ctk.CTkLabel(
+            top, text="clear", font=ctk.CTkFont(size=11, underline=True),
+            text_color="#6699cc", cursor="hand2",
+        )
+        self._achiev_clear.bind("<Button-1>", lambda _e: self._clear_achiev_check())
 
         self._mode_toggle = ctk.CTkSegmentedButton(
             top, values=["List", "Media"],
@@ -187,9 +197,9 @@ class CreationLoadOrderTool(ToolModule):
         self._tree.heading("Date", text="Date", anchor="w")
 
         self._tree.column("#", width=40, anchor="center", stretch=False)
-        self._tree.column("Name", width=380, anchor="w")
+        self._tree.column("Name", width=300, anchor="w")
         self._tree.column("Author", width=120, anchor="w", stretch=False)
-        self._tree.column("Version", width=100, anchor="w", stretch=False)
+        self._tree.column("Version", width=180, anchor="w", stretch=False)
         self._tree.column("Date", width=120, anchor="w", stretch=False)
 
         scrollbar = ttk.Scrollbar(
@@ -198,6 +208,8 @@ class CreationLoadOrderTool(ToolModule):
         self._tree.configure(yscrollcommand=scrollbar.set)
 
         self._tree.pack(side="left", fill="both", expand=True)
+        self._tree.configure(cursor="hand2")
+        self._tree.bind("<Double-1>", lambda _e: self._show_details())
         scrollbar.pack(side="right", fill="y")
 
         # Rich media scrollable frame (hidden initially)
@@ -219,6 +231,11 @@ class CreationLoadOrderTool(ToolModule):
         self._empty_label = ctk.CTkLabel(
             frame, text="", font=ctk.CTkFont(size=14)
         )
+
+        # Shared fonts for media rows (created once, reused)
+        self._font_title = ctk.CTkFont(size=15, weight="bold")
+        self._font_small = ctk.CTkFont(size=11)
+        self._font_desc = ctk.CTkFont(size=12)
 
         # Load data
         self._refresh()
@@ -328,13 +345,17 @@ class CreationLoadOrderTool(ToolModule):
             elif self._achievements_checked and creation.achievement_friendly is False:
                 tags.append("not_achievement_friendly")
 
-            date_text = ""
-            if creation.timestamp:
+            # Show the new version's date when an update is available
+            if self._checked and creation.has_update and info and info.last_updated:
+                date_text = info.last_updated
+            elif creation.timestamp:
                 date_text = creation.timestamp.strftime("%d %b %Y")
+            else:
+                date_text = ""
 
             self._tree.insert(
                 "", "end",
-                values=(pos, creation.display_name, author_text, version_text, date_text),
+                values=(pos, f"{creation.display_name}  \U0001F6C8", author_text, version_text, date_text),
                 tags=tuple(tags),
             )
 
@@ -346,6 +367,7 @@ class CreationLoadOrderTool(ToolModule):
         self._achievements_checked = False
         if self._achiev_summary:
             self._achiev_summary.configure(text="")
+        self._achiev_clear.pack_forget()
         self._populate_tree()
 
         self._context.status_bar.set_task("Checking for updates...")
@@ -391,8 +413,11 @@ class CreationLoadOrderTool(ToolModule):
                     text_color="green",
                 )
         self._populate_tree()
+        if self._grid_mode == _GRID_MODE_MEDIA:
+            self._populate_media()
         self._context.status_bar.clear_task()
         self._update_btn.configure(state="normal")
+        self._update_clear.pack(side="left", padx=(4, 0))
 
     def _on_updates_failed(self):
         if self._update_summary:
@@ -401,6 +426,16 @@ class CreationLoadOrderTool(ToolModule):
             )
         self._context.status_bar.clear_task()
         self._update_btn.configure(state="normal")
+        self._update_clear.pack(side="left", padx=(4, 0))
+
+    def _clear_update_check(self):
+        self._checked = False
+        if self._update_summary:
+            self._update_summary.configure(text="")
+        self._update_clear.pack_forget()
+        self._populate_tree()
+        if self._grid_mode == _GRID_MODE_MEDIA:
+            self._populate_media()
 
     def _check_achievements(self):
         if not self._context or not self._creations:
@@ -410,6 +445,7 @@ class CreationLoadOrderTool(ToolModule):
         self._checked = False
         if self._update_summary:
             self._update_summary.configure(text="")
+        self._update_clear.pack_forget()
         self._populate_tree()
 
         self._context.status_bar.set_task("Checking achievements...")
@@ -451,8 +487,20 @@ class CreationLoadOrderTool(ToolModule):
                     text_color="green" if skipped == 0 else "orange",
                 )
         self._populate_tree()
+        if self._grid_mode == _GRID_MODE_MEDIA:
+            self._populate_media()
         self._context.status_bar.clear_task()
         self._achiev_btn.configure(state="normal")
+        self._achiev_clear.pack(side="left", padx=(4, 0))
+
+    def _clear_achiev_check(self):
+        self._achievements_checked = False
+        if self._achiev_summary:
+            self._achiev_summary.configure(text="")
+        self._achiev_clear.pack_forget()
+        self._populate_tree()
+        if self._grid_mode == _GRID_MODE_MEDIA:
+            self._populate_media()
 
     def _on_achievements_failed(self):
         if self._achiev_summary:
@@ -461,6 +509,7 @@ class CreationLoadOrderTool(ToolModule):
             )
         self._context.status_bar.clear_task()
         self._achiev_btn.configure(state="normal")
+        self._achiev_clear.pack(side="left", padx=(4, 0))
 
     # -- Details dialog ------------------------------------------------
 
@@ -540,9 +589,10 @@ class CreationLoadOrderTool(ToolModule):
             self._media_rows.append(lbl)
             return
 
-        # Load cached info
-        from starfield_tool.creations import get_cached_info_any
-        self._cached_info = get_cached_info_any()
+        # Reuse cached info if available; only read disk when empty
+        if not self._cached_info:
+            from starfield_tool.creations import get_cached_info_any
+            self._cached_info = get_cached_info_any()
 
         has_any_cache = bool(self._cached_info)
 
@@ -557,11 +607,7 @@ class CreationLoadOrderTool(ToolModule):
     def _render_media_placeholders(self):
         """Show loading placeholders for each creation in media mode."""
         for creation in self._creations:
-            row = self._build_media_row(
-                creation,
-                info=None,
-                is_placeholder=True,
-            )
+            row = self._build_media_row(creation, info=None, is_placeholder=True)
             row.pack(fill="x", padx=4, pady=2)
             self._media_rows.append(row)
 
@@ -585,6 +631,7 @@ class CreationLoadOrderTool(ToolModule):
         """Build a single rich media row widget."""
         is_dark = ctk.get_appearance_mode() == "Dark"
         row_bg = "#333333" if is_dark else "#f0f0f0"
+        dim_color = "#aaaaaa" if is_dark else "#666666"
 
         row = ctk.CTkFrame(
             self._media_frame, height=_ROW_HEIGHT,
@@ -592,7 +639,7 @@ class CreationLoadOrderTool(ToolModule):
         )
         row.pack_propagate(False)
 
-        # Thumbnail — flush left, full row height, no rounding
+        # Thumbnail — flush left, full row height
         cached_ctk = self._thumbnail_cache.get(creation.content_id)
         if cached_ctk is not None:
             thumb_label = ctk.CTkLabel(
@@ -609,76 +656,86 @@ class CreationLoadOrderTool(ToolModule):
         thumb_label.pack(side="left", padx=(0, 8), pady=0)
         thumb_label._creation_cid = creation.content_id
 
-        # Text block: name (bold, larger) + description — selectable, wrapping
+        # Right-side info (pack before text block so it claims space first)
+        info_frame = ctk.CTkFrame(row, fg_color="transparent")
+        info_frame.pack(side="right", pady=8, padx=(0, 10))
+
+        author = info.author if info and info.author else "n/a"
+        version = creation.installed_version
+        if self._checked and creation.has_update and info and info.last_updated:
+            date = info.last_updated
+        elif creation.timestamp:
+            date = creation.timestamp.strftime("%d %b %Y")
+        else:
+            date = ""
+
+        ctk.CTkLabel(
+            info_frame, text=author, font=self._font_small, anchor="e",
+        ).pack(anchor="e", pady=0)
+        version_line = f"v{version}" + (f"  •  {date}" if date else "")
+        ctk.CTkLabel(
+            info_frame, text=version_line, font=self._font_small, anchor="e",
+        ).pack(anchor="e", pady=0)
+
+        # Text block: title + optional warning + description
         text_block = ctk.CTkFrame(row, fg_color="transparent")
         text_block.pack(side="left", fill="both", expand=True, pady=4)
 
         pos = str(creation.load_position + 1) if creation.load_position is not None else "-"
 
+        has_warning = False
         if is_placeholder:
             name_text = f"#{pos} — Loading..."
             desc_text = ""
         else:
             title = info.title if info and info.title else creation.display_name
-            name_text = f"#{pos} — {_decode_html(title)}"
+            name_text = f"#{pos} — {_decode_html(title)}  \U0001F6C8"
             desc_text = ""
             if info and info.description:
+                # Shorter excerpt when a warning line is shown
+                has_warning = (
+                    (self._checked and creation.has_update)
+                    or (self._achievements_checked and creation.achievement_friendly is False)
+                )
+                limit = 220 if has_warning else 350
                 desc_text = _truncate_at_word(
                     _decode_html(info.description).replace("\n", " ").replace("\r", ""),
-                    350,
+                    limit,
                 )
 
-        title_box = ctk.CTkTextbox(
-            text_block, height=30, wrap="word",
-            font=ctk.CTkFont(size=15, weight="bold"),
-            fg_color="transparent", border_width=0, border_spacing=0,
-            activate_scrollbars=False,
-        )
-        title_box._textbox.configure(pady=0)
-        title_box.insert("1.0", name_text)
-        title_box.configure(state="disabled")
-        title_box.pack(fill="x")
+        ctk.CTkLabel(
+            text_block, text=name_text,
+            font=self._font_title, anchor="w",
+        ).pack(fill="x")
+
+        # Warning label in constellation yellow
+        _warn_color = "#dba54b"
+        if not is_placeholder and has_warning:
+            if self._checked and creation.has_update and creation.available_version:
+                warn_text = f"\u26a0 v{creation.available_version} available"
+            else:
+                warn_text = "\u26a0 disables achievements"
+            ctk.CTkLabel(
+                text_block, text=warn_text,
+                font=self._font_small, text_color=_warn_color, anchor="w",
+            ).pack(fill="x")
 
         if desc_text:
-            dim_color = "#aaaaaa" if is_dark else "#666666"
-            desc_box = ctk.CTkTextbox(
-                text_block, wrap="word",
-                font=ctk.CTkFont(size=12),
-                text_color=dim_color,
-                fg_color="transparent", border_width=0, border_spacing=0,
-                activate_scrollbars=False,
-            )
-            desc_box._textbox.configure(spacing1=3, spacing2=3, spacing3=3, pady=0)
-            desc_box.insert("1.0", desc_text)
-            desc_box.configure(state="disabled")
-            desc_box.pack(fill="both", expand=True)
+            ctk.CTkLabel(
+                text_block, text=desc_text,
+                font=self._font_desc, anchor="nw", justify="left",
+                text_color=dim_color, wraplength=450,
+            ).pack(fill="both", expand=True)
 
-        # Right-side: author, version/date, details button stacked
-        info_frame = ctk.CTkFrame(row, fg_color="transparent")
-        info_frame.pack(side="right", pady=8, padx=(0, 10))
-
-        small_font = ctk.CTkFont(size=11)
-        author = info.author if info and info.author else "n/a"
-        version = creation.installed_version
-        date = creation.timestamp.strftime("%d %b %Y") if creation.timestamp else ""
-
-        ctk.CTkLabel(
-            info_frame, text=author, font=small_font, anchor="e",
-        ).pack(anchor="e", pady=0)
-
-        version_line = f"v{version}" + (f"  •  {date}" if date else "")
-        ctk.CTkLabel(
-            info_frame, text=version_line, font=small_font, anchor="e",
-        ).pack(anchor="e", pady=0)
-
+        # Details button under version
         _btn_color = "#314c79"
         _btn_hover = "#3d5f99"
         ctk.CTkButton(
-            info_frame, text="Details", width=60, height=26,
-            corner_radius=4, font=ctk.CTkFont(size=11),
+            info_frame, text="Details", width=60, height=24,
+            corner_radius=4, font=self._font_small,
             fg_color=_btn_color, hover_color=_btn_hover,
             command=lambda c=creation: self._show_details_for(c),
-        ).pack(anchor="e", pady=(6, 0))
+        ).pack(anchor="e", pady=(4, 0))
 
         return row
 
