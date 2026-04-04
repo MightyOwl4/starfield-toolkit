@@ -49,8 +49,10 @@ class CreationDetailsDialog(ctk.CTkToplevel):
     ):
         super().__init__(parent)
         self.title(f"Details — {display_name}")
-        self.geometry(f"{_DIALOG_WIDTH}x{_DIALOG_HEIGHT}")
         self.minsize(400, 400)
+
+        from starfield_tool.dialogs import center_dialog
+        center_dialog(self, _DIALOG_WIDTH, _DIALOG_HEIGHT)
 
         # DiffDialog windowing pattern — no grab_set / transient
         self.attributes("-topmost", True)

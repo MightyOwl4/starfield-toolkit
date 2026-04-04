@@ -1,14 +1,15 @@
 """Tests for the load_order_sorter package."""
 import json
-from pathlib import Path
 
 import yaml
 
 from load_order_sorter import sort_creations, save_snapshot, load_snapshot
-from load_order_sorter.models import SortItem, SortConstraint, SortDecision
+from load_order_sorter.models import (
+    SortItem, SortConstraint, SortDecision, SortedItem,
+)
 from load_order_sorter.sorters.category import sort as category_sort
 from load_order_sorter.sorters.loot import sort as loot_sort
-from load_order_sorter.pipeline import _merge_constraints, _solve
+from load_order_sorter.pipeline import _merge_constraints, _solve, _topo_sort_bucket
 
 
 def _item(name, content_id="", categories=None, index=0, author=""):
@@ -282,3 +283,246 @@ class TestSnapshot:
             assert False, "Should have raised ValueError"
         except ValueError:
             pass
+
+
+class TestMergePartial:
+    """Tests for the diff dialog's partial-accept merge logic."""
+
+    @staticmethod
+    def _merge(current, proposed_items, accepted_names):
+        """Run _merge_partial without a GUI by constructing the internals."""
+        from starfield_tool.tools.load_order_diff import DiffDialog
+        # Build a minimal DiffDialog without invoking __init__ (no Tk needed)
+        dialog = object.__new__(DiffDialog)
+        dialog._current = current
+        dialog._proposed = proposed_items
+        dialog._accepted = {
+            si.plugin_name: (si.plugin_name in accepted_names)
+            for si in proposed_items if si.moved
+        }
+        return dialog._merge_partial(accepted_names)
+
+    @staticmethod
+    def _si(name, orig, new):
+        return SortedItem(
+            plugin_name=name, content_id=name, display_name=name,
+            original_index=orig, new_index=new, moved=(orig != new),
+            decision=SortDecision(sorter_name="TEST") if orig != new else None,
+        )
+
+    def test_single_accept(self):
+        current = ["A", "B", "C", "D"]
+        proposed = [
+            self._si("C", 2, 0), self._si("A", 0, 1),
+            self._si("B", 1, 2), self._si("D", 3, 3),
+        ]
+        result = self._merge(current, proposed, {"C"})
+        # C accepted to front, A and B stay in current relative order
+        assert result == ["C", "A", "B", "D"]
+
+    def test_multiple_non_adjacent_accepts(self):
+        current = ["A", "B", "C", "D", "E"]
+        proposed = [
+            self._si("E", 4, 0), self._si("D", 3, 1),
+            self._si("C", 2, 2), self._si("B", 1, 3),
+            self._si("A", 0, 4),
+        ]
+        # Accept E (to front) and A (to end)
+        result = self._merge(current, proposed, {"E", "A"})
+        assert result[0] == "E"
+        assert result[-1] == "A"
+        # B, C, D keep their current relative order in the middle
+        middle = result[1:-1]
+        assert middle == ["B", "C", "D"]
+
+    def test_accept_all_equals_proposed(self):
+        current = ["A", "B", "C"]
+        proposed = [
+            self._si("C", 2, 0), self._si("A", 0, 1), self._si("B", 1, 2),
+        ]
+        result = self._merge(current, proposed, {"C", "A", "B"})
+        assert result == ["C", "A", "B"]
+
+    def test_accept_none_returns_current(self):
+        current = ["A", "B", "C"]
+        proposed = [
+            self._si("C", 2, 0), self._si("A", 0, 1), self._si("B", 1, 2),
+        ]
+        result = self._merge(current, proposed, set())
+        assert result == ["A", "B", "C"]
+
+    def test_swap_accept_one(self):
+        """Two items swap; accepting one should place it correctly."""
+        current = ["A", "B", "C"]
+        proposed = [
+            self._si("A", 0, 0), self._si("C", 2, 1), self._si("B", 1, 2),
+        ]
+        # Accept C moving from 2→1
+        result = self._merge(current, proposed, {"C"})
+        # A stays, C accepted at proposed slot 1, B fills remaining slot
+        assert result == ["A", "C", "B"]
+
+
+class TestTopologicalSortCycles:
+    """Test that cycles in load-after constraints don't crash the solver."""
+
+    def test_cycle_includes_all_items(self):
+        """A→B→A cycle should still produce output with all items."""
+        items = [_item("a.esm", index=0), _item("b.esm", index=1)]
+        decisions = {
+            "a.esm": SortDecision(tier=5, load_after=["b.esm"]),
+            "b.esm": SortDecision(tier=5, load_after=["a.esm"]),
+        }
+        result = _topo_sort_bucket(items, decisions)
+        names = {si.plugin_name for si in result}
+        assert names == {"a.esm", "b.esm"}
+
+    def test_three_way_cycle(self):
+        items = [
+            _item("a.esm", index=0),
+            _item("b.esm", index=1),
+            _item("c.esm", index=2),
+        ]
+        decisions = {
+            "a.esm": SortDecision(tier=5, load_after=["c.esm"]),
+            "b.esm": SortDecision(tier=5, load_after=["a.esm"]),
+            "c.esm": SortDecision(tier=5, load_after=["b.esm"]),
+        }
+        result = _topo_sort_bucket(items, decisions)
+        names = [si.plugin_name for si in result]
+        assert len(names) == 3
+        assert set(names) == {"a.esm", "b.esm", "c.esm"}
+
+    def test_partial_cycle_with_free_items(self):
+        """Items not in the cycle should sort normally."""
+        items = [
+            _item("free.esm", index=0),
+            _item("a.esm", index=1),
+            _item("b.esm", index=2),
+        ]
+        decisions = {
+            "free.esm": SortDecision(tier=5),
+            "a.esm": SortDecision(tier=5, load_after=["b.esm"]),
+            "b.esm": SortDecision(tier=5, load_after=["a.esm"]),
+        }
+        result = _topo_sort_bucket(items, decisions)
+        names = [si.plugin_name for si in result]
+        # free.esm has no deps, should come first (lowest original_index)
+        assert names[0] == "free.esm"
+        assert set(names) == {"free.esm", "a.esm", "b.esm"}
+
+
+class TestSnapshotEdgeCases:
+    def test_snapshot_with_tool_object(self, tmp_path):
+        """Snapshot with nested tool object parses version correctly."""
+        from load_order_sorter.models import SnapshotEntry
+        path = tmp_path / "snap.json"
+        save_snapshot("Test", [
+            SnapshotEntry("id1", "Name1", ["a.esm"]),
+        ], path, "2.5.0")
+        snap = load_snapshot(path)
+        assert snap.tool_version == "2.5.0"
+
+    def test_legacy_snapshot_tool_version(self, tmp_path):
+        """Legacy format with top-level tool_version string."""
+        f = tmp_path / "legacy.json"
+        f.write_text(json.dumps({
+            "name": "old",
+            "tool_version": "1.0",
+            "plugins": ["a.esm"],
+        }), encoding="utf-8")
+        snap = load_snapshot(f)
+        assert snap.tool_version == "1.0"
+
+    def test_empty_creations_list(self, tmp_path):
+        """Snapshot with empty creations list is valid."""
+        f = tmp_path / "empty.json"
+        f.write_text(json.dumps({
+            "name": "empty", "creations": [],
+        }), encoding="utf-8")
+        snap = load_snapshot(f)
+        assert snap.entries == []
+
+    def test_creation_missing_optional_fields(self, tmp_path):
+        """Creations with only 'id' field should load (name/files optional)."""
+        f = tmp_path / "minimal.json"
+        f.write_text(json.dumps({
+            "name": "min",
+            "creations": [{"id": "abc"}],
+        }), encoding="utf-8")
+        snap = load_snapshot(f)
+        assert snap.entries[0].content_id == "abc"
+        assert snap.entries[0].display_name == ""
+        assert snap.entries[0].files == []
+
+
+class TestLootSorterSkipGroups:
+    """LOOT sorter skips tier assignment for BGS Creations / Trackers Alliance groups."""
+
+    def test_bgs_creations_group_skipped(self, tmp_path):
+        masterlist = {
+            "plugins": [
+                {"name": "sfbgs_skin.esm",
+                 "group": "Bethesda Game Studios Creations"},
+            ]
+        }
+        ml_path = tmp_path / "ml.yaml"
+        ml_path.write_text(yaml.dump(masterlist), encoding="utf-8")
+
+        items = [_item("sfbgs_skin.esm", index=0)]
+        constraints = loot_sort(items, ml_path)
+        # No tier constraint — falls through to category sorter
+        tier_constraints = [c for c in constraints if c.type == "tier" and c.tier is not None]
+        assert len(tier_constraints) == 0
+
+    def test_bgs_creations_group_warnings_still_surfaced(self, tmp_path):
+        masterlist = {
+            "plugins": [
+                {"name": "sfbgs_skin.esm",
+                 "group": "Bethesda Game Studios Creations",
+                 "msg": [{"type": "warn", "content": "Needs update"}]},
+            ]
+        }
+        ml_path = tmp_path / "ml.yaml"
+        ml_path.write_text(yaml.dump(masterlist), encoding="utf-8")
+
+        items = [_item("sfbgs_skin.esm", index=0)]
+        constraints = loot_sort(items, ml_path)
+        # Warning is still surfaced even though tier is skipped
+        warnings = [w for c in constraints for w in c.warnings]
+        assert "Needs update" in warnings
+
+    def test_trackers_alliance_group_skipped(self, tmp_path):
+        masterlist = {
+            "plugins": [
+                {"name": "sfta01.esm", "group": "Trackers Alliance"},
+            ]
+        }
+        ml_path = tmp_path / "ml.yaml"
+        ml_path.write_text(yaml.dump(masterlist), encoding="utf-8")
+
+        items = [_item("sfta01.esm", index=0)]
+        constraints = loot_sort(items, ml_path)
+        tier_constraints = [c for c in constraints if c.type == "tier" and c.tier is not None]
+        assert len(tier_constraints) == 0
+
+
+class TestLootSorterLoadAfter:
+    """LOOT load-after constraints with case-insensitive matching."""
+
+    def test_case_insensitive_plugin_match(self, tmp_path):
+        masterlist = {
+            "plugins": [
+                {"name": "MyMod.esm", "group": "Core Mods",
+                 "after": [{"name": "Base.esm"}]},
+            ]
+        }
+        ml_path = tmp_path / "ml.yaml"
+        ml_path.write_text(yaml.dump(masterlist), encoding="utf-8")
+
+        # Items use different casing than masterlist
+        items = [_item("mymod.esm", index=0), _item("base.esm", index=1)]
+        constraints = loot_sort(items, ml_path)
+        after_c = [c for c in constraints if c.type == "load_after"]
+        assert len(after_c) == 1
+        assert after_c[0].after == "base.esm"

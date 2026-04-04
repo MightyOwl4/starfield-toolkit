@@ -21,8 +21,10 @@ class DiffDialog(ctk.CTkToplevel):
     ):
         super().__init__(parent)
         self.title("Review Proposed Load Order")
-        self.geometry("900x600")
         self.minsize(800, 400)
+
+        from starfield_tool.dialogs import center_dialog
+        center_dialog(self, 900, 600)
         # No transient/grab_set — those break Win+D recovery on Windows.
         # Show as a regular taskbar window so Alt+Tab always works.
         self.attributes("-topmost", True)
@@ -126,7 +128,7 @@ class DiffDialog(ctk.CTkToplevel):
         tree.heading("Info", text="Info", anchor="w")
         tree.column("#", width=35, anchor="center", stretch=False)
         tree.column("Name", width=250, anchor="w")
-        tree.column("Info", width=100, anchor="w", stretch=False)
+        tree.column("Info", width=150, anchor="w", stretch=False)
         tree.pack(fill="both", expand=True, pady=(2, 0))
         return tree
 
@@ -157,11 +159,8 @@ class DiffDialog(ctk.CTkToplevel):
                 info_parts.append(f"was #{si.original_index + 1}")
                 if si.decision and si.decision.sorter_name:
                     info_parts.append(si.decision.sorter_name)
-                if si.plugin_name in self._accepted:
-                    if self._accepted[si.plugin_name]:
-                        info_parts.append("\u2713")
-                    else:
-                        info_parts.append("\u2022")
+                if self._accepted.get(si.plugin_name):
+                    info_parts.append("\u2713")
 
             info = " ".join(info_parts)
             accepted = self._accepted.get(si.plugin_name, False)
@@ -238,21 +237,37 @@ class DiffDialog(ctk.CTkToplevel):
 
     def _merge_partial(self, accepted_names: set[str]) -> list[str]:
         """Merge partial accept: accepted items at proposed positions,
-        ignored items stay at current positions."""
-        # Items that didn't move + ignored items keep current order
-        fixed = []
+        ignored items stay at current positions.
+
+        Build the result by walking the proposed order.  For each slot we
+        pick either the next accepted item (if the proposed list says an
+        accepted item goes here) or the next non-accepted item from the
+        current order (preserving their relative sequence).
+        """
+        # Queue of non-accepted items in their current-order sequence
+        fixed_queue: list[str] = []
         for name in self._current:
             proposed = self._find_proposed(name)
             if proposed and proposed.moved and name in accepted_names:
-                continue  # will be placed at proposed position
-            fixed.append(name)
+                continue  # placed by proposed order below
+            fixed_queue.append(name)
 
-        # Insert accepted items at their proposed positions
-        result = list(fixed)
+        # Walk the proposed order to build the result
+        result: list[str] = []
+        fixed_iter = iter(fixed_queue)
         for si in self._proposed:
             if si.plugin_name in accepted_names and si.moved:
-                pos = min(si.new_index, len(result))
-                result.insert(pos, si.plugin_name)
+                result.append(si.plugin_name)
+            else:
+                # Pull the next item from the fixed queue
+                item = next(fixed_iter, None)
+                if item is not None:
+                    result.append(item)
+
+        # Append any remaining fixed items (shouldn't happen in normal
+        # operation, but guards against length mismatches)
+        for item in fixed_iter:
+            result.append(item)
 
         return result
 

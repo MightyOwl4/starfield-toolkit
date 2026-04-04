@@ -81,13 +81,24 @@ def parse_response(data: dict) -> CreationInfo:
                     info.installation_size = f"{size_bytes / 1_048_576:.2f} MB"
                 break
 
+            # Use the latest version's build timestamp as last_updated.
+            # The top-level utime is a metadata-edit timestamp (description
+            # changes, category tweaks) and does not reflect version releases.
+            version_ctime = latest.get("ctime")
+            if version_ctime:
+                from datetime import datetime, timezone
+                info.last_updated = datetime.fromtimestamp(
+                    version_ctime, tz=timezone.utc
+                ).strftime("%b %d, %Y")
+
     # Dates from unix timestamps
     if resp.get("first_ptime"):
         from datetime import datetime, timezone
         info.created_on = datetime.fromtimestamp(
             resp["first_ptime"], tz=timezone.utc
         ).strftime("%b %d, %Y")
-    if resp.get("utime"):
+    # Fallback: use utime only if no version-specific date was found
+    if not info.last_updated and resp.get("utime"):
         from datetime import datetime, timezone
         info.last_updated = datetime.fromtimestamp(
             resp["utime"], tz=timezone.utc

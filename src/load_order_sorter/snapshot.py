@@ -77,7 +77,7 @@ def load_snapshot(path: Path) -> Snapshot:
         raise ValueError("Snapshot missing 'creations' or 'plugins' field")
 
     # Support both new "tool" object and legacy "tool_version" string
-    tool = data.get("tool", {})
+    tool = data.get("tool")
     if isinstance(tool, dict):
         tool_version = tool.get("version", "")
     else:
