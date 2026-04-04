@@ -202,13 +202,14 @@ class LoadOrderTool(ToolModule):
         # Walk the load order, grouping consecutive or scattered files
         seen_entries: set[str] = set()  # content_id of entries already grouped
         groups: list[_CreationGroup] = []
+        plugins_set = set(self._plugins)
 
         for plugin in self._plugins:
             entry = file_to_entry.get(plugin)
             if entry and entry.content_id not in seen_entries:
                 seen_entries.add(entry.content_id)
                 # Collect all files for this entry that are in the plugin list
-                entry_files = [f for f in entry.files if f in set(self._plugins)]
+                entry_files = [f for f in entry.files if f in plugins_set]
                 groups.append(_CreationGroup(
                     key=entry_files[0] if entry_files else plugin,
                     display_name=entry.title,
@@ -363,6 +364,10 @@ class LoadOrderTool(ToolModule):
             return
         self._context.status_bar.set_task("Sorting...")
 
+        # Snapshot working state before entering background thread to avoid
+        # races with drag-and-drop on the main thread.
+        groups_snapshot = list(self._working_groups)
+
         def _run():
             from load_order_sorter import sort_creations, SortItem
             from starfield_tool.creations import get_cached_info_any, _make_client
@@ -383,7 +388,7 @@ class LoadOrderTool(ToolModule):
                         content_id=g.content_id or g.key,
                         display_name=g.display_name,
                     )
-                    for g in self._working_groups
+                    for g in groups_snapshot
                     if g.content_id
                 ]
                 try:
@@ -393,7 +398,7 @@ class LoadOrderTool(ToolModule):
                 self._context.status_bar.set_task("Sorting...")
 
             items = []
-            for i, group in enumerate(self._working_groups):
+            for i, group in enumerate(groups_snapshot):
                 info = cached.get(group.content_id) if group.content_id else None
                 categories = info.categories if info else group.categories
                 author = info.author if info else ""
@@ -488,6 +493,8 @@ class LoadOrderTool(ToolModule):
             # Reorder working_groups to match the accepted key order
             key_to_group = {g.key: g for g in self._working_groups}
             new_groups = [key_to_group[k] for k in dialog.result if k in key_to_group]
+            # Rebuild dirty set from scratch — compare each position to saved
+            self._dirty_items.clear()
             for i, group in enumerate(new_groups):
                 saved_idx = next(
                     (j for j, g in enumerate(self._groups) if g.key == group.key), -1
@@ -496,6 +503,8 @@ class LoadOrderTool(ToolModule):
                     self._dirty_items.add(group.key)
                     if group.key not in self._original_positions:
                         self._original_positions[group.key] = saved_idx
+                else:
+                    self._original_positions.pop(group.key, None)
             self._working_groups = new_groups
             self._populate_tree()
             self._update_buttons()
