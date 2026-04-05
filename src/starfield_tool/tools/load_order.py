@@ -307,6 +307,15 @@ class LoadOrderTool(ToolModule):
                 "Close Starfield before applying load order changes.",
             )
             return
+
+        # TES4 master dependency validation (non-bypassable)
+        tes4_violations = self._validate_tes4_order()
+        if tes4_violations:
+            from load_order_sorter.validation import format_violations
+            msg = format_violations(tes4_violations)
+            messagebox.showwarning("Load Order Violation", msg)
+            return
+
         plugins_path = self._context.game_installation.plugins_txt
         try:
             # Preserve the * prefix for active plugins
@@ -338,6 +347,36 @@ class LoadOrderTool(ToolModule):
             self._tree.after(2000, lambda: self._status_label.configure(text=""))
         except OSError as e:
             messagebox.showerror("Write Error", f"Cannot write Plugins.txt: {e}")
+
+    def _validate_tes4_order(self):
+        """Check proposed order against TES4 master dependencies.
+
+        Returns list of violations, or empty list if order is valid.
+        Builds the master map on demand if not cached from auto-sort.
+        """
+        from load_order_sorter.validation import validate_tes4_order
+        from load_order_sorter.tes4_parser import build_master_map
+
+        if not self._context or not self._context.game_installation:
+            return []
+
+        # Build master map if not cached
+        master_map = getattr(self, "_tes4_master_map", None)
+        if master_map is None:
+            data_dir = self._context.game_installation.data_dir
+            installed_plugins = {
+                g.key: g.content_id or g.key
+                for g in self._working_groups
+            }
+            master_map = build_master_map(data_dir, installed_plugins)
+            self._tes4_master_map = master_map
+
+        if not master_map:
+            return []
+
+        plugin_order = [f for g in self._working_groups for f in g.files]
+        display_names = {g.key: g.display_name for g in self._working_groups}
+        return validate_tes4_order(plugin_order, master_map, display_names)
 
     def _discard(self):
         self._working_groups = list(self._groups)
@@ -417,8 +456,31 @@ class LoadOrderTool(ToolModule):
             if loot_available:
                 active.append("loot")
 
-            result = sort_creations(items, sorters=active,
-                                    masterlist_path=masterlist_path)
+            # TES4 master dependency sorter (highest priority)
+            game_data_dir = None
+            installed_plugins = None
+            if self._context and self._context.game_installation:
+                game_data_dir = self._context.game_installation.data_dir
+                installed_plugins = {
+                    g.key: g.content_id or g.key
+                    for g in groups_snapshot
+                }
+                active.append("tes4")
+
+            result = sort_creations(
+                items,
+                sorters=active,
+                masterlist_path=masterlist_path,
+                data_dir=game_data_dir,
+                installed_plugins=installed_plugins,
+            )
+
+            # Cache master map for apply validation
+            if game_data_dir and installed_plugins:
+                from load_order_sorter.tes4_parser import build_master_map
+                self._tes4_master_map = build_master_map(
+                    game_data_dir, installed_plugins
+                )
 
             self._tree.after(
                 0, lambda: self._on_sort_complete(result, loot_available)

@@ -7,10 +7,12 @@ from load_order_sorter.models import (
 )
 from load_order_sorter.sorters import category as category_sorter
 from load_order_sorter.sorters import loot as loot_sorter
+from load_order_sorter.sorters import tes4 as tes4_sorter
 
 _SORTERS = {
     "category": category_sorter,
     "loot": loot_sorter,
+    "tes4": tes4_sorter,
 }
 
 DEFAULT_TIER = 9
@@ -20,6 +22,8 @@ def sort_creations(
     items: list[SortItem],
     sorters: list[str] | None = None,
     masterlist_path: Path | None = None,
+    data_dir: Path | None = None,
+    installed_plugins: dict[str, str] | None = None,
 ) -> SortResult:
     """Run the sorter pipeline and return a proposed order.
 
@@ -38,6 +42,11 @@ def sort_creations(
                 all_constraints.extend(loot_sorter.sort(items, masterlist_path))
         elif name == "category":
             all_constraints.extend(category_sorter.sort(items))
+        elif name == "tes4":
+            if data_dir and installed_plugins:
+                all_constraints.extend(
+                    tes4_sorter.sort(items, data_dir, installed_plugins)
+                )
 
     # Merge constraints
     decisions = _merge_constraints(all_constraints)
@@ -76,12 +85,17 @@ def _merge_constraints(
                     decision.sorter_name = c.sorter_name
                     best_tier_priority = c.priority
 
-        # Accumulate load_after (union)
+        # Accumulate load_after (union), tracking which sorter contributed each
         after_set: set[str] = set()
+        after_sorters: dict[str, str] = {}
         for c in plugin_constraints:
             if c.type == "load_after" and c.after:
                 after_set.add(c.after)
+                # Highest-priority sorter wins the attribution for display
+                if c.after not in after_sorters or c.priority > 0:
+                    after_sorters[c.after] = c.sorter_name
         decision.load_after = sorted(after_set)
+        decision.load_after_sorters = after_sorters
 
         # Merge warnings from all sorters
         all_warnings: list[str] = []
@@ -94,11 +108,50 @@ def _merge_constraints(
     return decisions
 
 
+def _promote_cross_tier(
+    items: list[SortItem],
+    decisions: dict[str, SortDecision],
+) -> None:
+    """Promote items to higher tiers when their load_after targets are in later tiers.
+
+    If item A (tier 3) has a load_after dependency on item B (tier 5),
+    A is promoted to tier 5. This ensures cross-tier dependencies are
+    honored rather than silently dropped.
+
+    Iterates until stable (handles transitive chains).
+    """
+    tier_for = {}
+    for item in items:
+        d = decisions.get(item.plugin_name)
+        tier_for[item.plugin_name] = d.tier if d else DEFAULT_TIER
+
+    changed = True
+    while changed:
+        changed = False
+        for item in items:
+            d = decisions.get(item.plugin_name)
+            if not d or not d.load_after:
+                continue
+            current_tier = tier_for[item.plugin_name]
+            max_dep_tier = current_tier
+            for dep in d.load_after:
+                dep_tier = tier_for.get(dep, DEFAULT_TIER)
+                if dep_tier > max_dep_tier:
+                    max_dep_tier = dep_tier
+            if max_dep_tier > current_tier:
+                tier_for[item.plugin_name] = max_dep_tier
+                d.tier = max_dep_tier
+                changed = True
+
+
 def _solve(
     items: list[SortItem],
     decisions: dict[str, SortDecision],
 ) -> list[SortedItem]:
     """Produce final order: group by tier, topological sort within tier."""
+    # Promote items to later tiers when cross-tier dependencies exist
+    _promote_cross_tier(items, decisions)
+
     # Assign each item to its tier
     tier_buckets: dict[int, list[SortItem]] = defaultdict(list)
     for item in items:
