@@ -8,11 +8,13 @@ from load_order_sorter.models import (
 from load_order_sorter.sorters import category as category_sorter
 from load_order_sorter.sorters import loot as loot_sorter
 from load_order_sorter.sorters import tes4 as tes4_sorter
+from load_order_sorter.sorters import rulebook as rulebook_sorter
 
 _SORTERS = {
     "category": category_sorter,
     "loot": loot_sorter,
     "tes4": tes4_sorter,
+    "rulebook": rulebook_sorter,
 }
 
 DEFAULT_TIER = 9
@@ -24,6 +26,9 @@ def sort_creations(
     masterlist_path: Path | None = None,
     data_dir: Path | None = None,
     installed_plugins: dict[str, str] | None = None,
+    user_rules_dir: Path | None = None,
+    curated_rules_dir: Path | None = None,
+    rulebook_registry: list[dict] | None = None,
 ) -> SortResult:
     """Run the sorter pipeline and return a proposed order.
 
@@ -46,6 +51,17 @@ def sort_creations(
             if data_dir and installed_plugins:
                 all_constraints.extend(
                     tes4_sorter.sort(items, data_dir, installed_plugins)
+                )
+        elif name == "rulebook":
+            if user_rules_dir and installed_plugins:
+                all_constraints.extend(
+                    rulebook_sorter.sort(
+                        items,
+                        user_rules_dir,
+                        curated_rules_dir,
+                        rulebook_registry,
+                        installed_plugins,
+                    )
                 )
 
     # Merge constraints
