@@ -44,6 +44,62 @@ def search_uuid_by_title(client: httpx.Client, title: str) -> str | None:
     return None
 
 
+CATALOGUE_USER_AGENT = (
+    "StarfieldToolkit/1.0 (+https://github.com/MightyOwl4/starfield-tool/issues)"
+)
+
+
+def enumerate_creations(
+    client: httpx.Client, page: int = 1, size: int = 20
+) -> tuple[list[dict], int]:
+    """Fetch a page of ALL Starfield creations from the listing API.
+
+    Returns (items, total) where items is the list of creation dicts
+    and total is the overall count of creations on the platform.
+    """
+    resp = client.get(
+        CREATIONS_SEARCH_API,
+        params={"product": "GENESIS", "page": page, "size": size},
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    payload = body.get("platform", {}).get("response", body)
+    items = payload.get("data", [])
+    total = payload.get("total", 0)
+    return items, total
+
+
+def fetch_creation_summary(
+    client: httpx.Client, content_id: str
+) -> dict | None:
+    """Fetch the summaryPC.json for a creation (plugin files, dependencies, ESL status).
+
+    Requires fetching the individual detail endpoint first to get the
+    download slot URLs, then fetching the summary JSON.
+    Returns None if no WINDOWS download or summary is available.
+    """
+    resp = client.get(CREATIONS_API.format(uuid=content_id))
+    resp.raise_for_status()
+    body = resp.json()
+    detail = body.get("platform", {}).get("response", {})
+
+    # Find WINDOWS download entry
+    for dl in detail.get("download", []):
+        if dl.get("hardware_platform") != "WINDOWS":
+            continue
+        published = dl.get("published", [])
+        if not published:
+            continue
+        summary_slot = published[0].get("client", {}).get("summary")
+        if not summary_slot or not summary_slot.get("download_url"):
+            continue
+        # Fetch the summary JSON (this is a plain CDN URL, no auth needed)
+        summary_resp = client.get(summary_slot["download_url"])
+        summary_resp.raise_for_status()
+        return summary_resp.json()
+    return None
+
+
 def _get_platform_data(entries: list, platform: str = "WINDOWS") -> dict | None:
     """Find the entry for a specific platform in a list of per-platform dicts."""
     for entry in entries:
