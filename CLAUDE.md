@@ -1,6 +1,6 @@
 # starfield-tool Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-01
+Auto-generated from all feature plans. Last updated: 2026-04-05
 
 ## Active Technologies
 
