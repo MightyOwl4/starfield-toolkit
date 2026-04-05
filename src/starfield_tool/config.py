@@ -14,11 +14,6 @@ class AppSettings:
     game_path: str | None = None
     window_geometry: str | None = None
     beta_acknowledged: bool = False
-    rulebook_registry: list = None
-
-    def __post_init__(self):
-        if self.rulebook_registry is None:
-            self.rulebook_registry = []
 
 
 def load_config(path: Path | None = None) -> AppSettings:
@@ -29,7 +24,6 @@ def load_config(path: Path | None = None) -> AppSettings:
             game_path=data.get("game_path"),
             window_geometry=data.get("window_geometry"),
             beta_acknowledged=data.get("beta_acknowledged", False),
-            rulebook_registry=data.get("rulebook_registry", []),
         )
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return AppSettings()

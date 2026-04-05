@@ -283,12 +283,7 @@ class LoadOrderTool(ToolModule):
                 self._drag_item = children[dst_idx]
             self._update_buttons()
 
-    def _on_drag_end(self, event):
-        if self._drag_item is None:
-            # No drag occurred — check if click was on empty space
-            item = self._tree.identify_row(event.y)
-            if not item:
-                self._tree.selection_remove(*self._tree.selection())
+    def _on_drag_end(self, _event):
         self._drag_item = None
 
     # --- Apply / Discard ---
@@ -383,19 +378,6 @@ class LoadOrderTool(ToolModule):
         display_names = {g.key: g.display_name for g in self._working_groups}
         return validate_tes4_order(plugin_order, master_map, display_names)
 
-    def _get_curated_rules_dir(self) -> Path | None:
-        """Find the curated rule books directory (bundled or dev)."""
-        import sys
-        if hasattr(sys, "_MEIPASS"):
-            p = Path(sys._MEIPASS) / "data" / "rules"
-            if p.is_dir():
-                return p
-        # Dev mode: check project root
-        dev_path = Path(__file__).parent.parent.parent.parent / "data" / "rules"
-        if dev_path.is_dir():
-            return dev_path
-        return None
-
     def _discard(self):
         self._working_groups = list(self._groups)
         self._dirty_items.clear()
@@ -485,29 +467,15 @@ class LoadOrderTool(ToolModule):
                 }
                 active.append("tes4")
 
-            # Rule book sorter
-            user_rules_dir = None
-            curated_rules_dir = None
-            rb_registry = None
-            if installed_plugins:
-                from starfield_tool.config import _config_path, load_config
-                user_rules_dir = _config_path().parent / "rules"
-                curated_rules_dir = self._get_curated_rules_dir()
-                rb_registry = load_config().rulebook_registry
-                active.append("rulebook")
-
             result = sort_creations(
                 items,
                 sorters=active,
                 masterlist_path=masterlist_path,
                 data_dir=game_data_dir,
                 installed_plugins=installed_plugins,
-                user_rules_dir=user_rules_dir,
-                curated_rules_dir=curated_rules_dir,
-                rulebook_registry=rb_registry,
             )
 
-            # Cache TES4 master map for apply validation
+            # Cache master map for apply validation
             if game_data_dir and installed_plugins:
                 from load_order_sorter.tes4_parser import build_master_map
                 self._tes4_master_map = build_master_map(

@@ -160,12 +160,8 @@ class DiffDialog(ctk.CTkToplevel):
                 if si.decision and si.decision.sorter_name:
                     info_parts.append(si.decision.sorter_name)
                 if (si.decision and si.decision.load_after_sorters
-                        and any(s in si.decision.load_after_sorters.values()
-                                for s in ("TES4", "RULE"))):
-                    extra = set(si.decision.load_after_sorters.values()) - {
-                        si.decision.sorter_name}
-                    for s in sorted(extra):
-                        info_parts.append(s)
+                        and "TES4" in si.decision.load_after_sorters.values()):
+                    info_parts.append("TES4")
                 if self._accepted.get(si.plugin_name):
                     info_parts.append("\u2713")
 
