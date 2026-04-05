@@ -210,6 +210,7 @@ class CreationLoadOrderTool(ToolModule):
         self._tree.pack(side="left", fill="both", expand=True)
         self._tree.configure(cursor="hand2")
         self._tree.bind("<Double-1>", lambda _e: self._show_details())
+        self._tree.bind("<Button-1>", self._on_click_deselect)
         scrollbar.pack(side="right", fill="y")
 
         # Rich media scrollable frame (hidden initially)
@@ -510,6 +511,12 @@ class CreationLoadOrderTool(ToolModule):
         self._context.status_bar.clear_task()
         self._achiev_btn.configure(state="normal")
         self._achiev_clear.pack(side="left", padx=(4, 0))
+
+    def _on_click_deselect(self, event):
+        """Deselect when clicking on empty area of the treeview."""
+        item = self._tree.identify_row(event.y)
+        if not item:
+            self._tree.selection_remove(*self._tree.selection())
 
     # -- Details dialog ------------------------------------------------
 
