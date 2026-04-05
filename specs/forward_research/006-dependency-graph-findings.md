@@ -153,6 +153,37 @@ What the engine does **NOT** do:
 
 This confirms the ESM header is the ground truth for dependencies. The deeper conflict detection (same-cell edits) would require parsing beyond the TES4 header into the actual record groups — significantly more complex but possible with the `detailPC.json` form data (available from Source 2's API endpoint).
 
+## Validation Case: Luxurious Ship Habs PDY Patch (2026-04-05)
+
+A real-world example that demonstrates the gap between TES4 headers and full dependency resolution, validating the need for Sources 3 (description parsing) and rule books.
+
+**The creations**:
+- **Place Doors Yourself** (`PlaceDoorsYourself.esm`)
+- **Luxurious Ship Habs** (`DWN_LuxHabs.esm`)
+- **Luxurious Ship Habs - Patch - Place Doors Yourself** (`DWN_LuxHabs_PDYPatch.esm`)
+
+**What TES4 headers express**:
+The patch's MAST entries list both `PlaceDoorsYourself.esm` and `DWN_LuxHabs.esm` as masters. This tells the solver: "patch must load after BOTH masters." But MAST entries are an unordered set — they cannot express that PDY must come before LuxHabs.
+
+**What the description explicitly states**:
+```
+### Load Order
+PlaceDoorsYourself.esm
+DWN_LuxHabs.esm
+DWN_LuxHabs_PDYPatch.esm
+```
+
+The author specifies that PDY must load **before** LuxHabs, then the patch after both. This inter-master ordering is critical for correctness but invisible to TES4 parsing.
+
+**What the TES4 sorter (006 Phase A) produces**:
+The solver correctly places the patch after both masters, but the relative order of PDY vs LuxHabs is determined by category tiers/original position — which may be wrong. In this case: `DWN_LuxHabs.esm` → `PlaceDoorsYourself.esm` → `DWN_LuxHabs_PDYPatch.esm` (LuxHabs before PDY, opposite of what the author requires).
+
+**What's needed to fix this**:
+- **Source 3 (description parsing, feature 006)**: Could detect the explicit `.esm` filename sequence in the description and produce a `load_after` constraint: `DWN_LuxHabs.esm` after `PlaceDoorsYourself.esm`
+- **Rule books (feature 007)**: A user or curated rule book could capture this constraint explicitly
+
+**Key insight**: TES4 headers express "what I need" but not "what order my dependencies need relative to each other." That inter-dependency ordering can only come from description analysis, rule books, or user knowledge. This is why the full constraint hierarchy (TES4 → rule books → patch analysis → LOOT → category) is needed — each layer covers gaps the others can't.
+
 ## Recommended Approach for 006
 
 ### For installed creations (runtime, in the app):
@@ -168,6 +199,97 @@ This confirms the ESM header is the ground truth for dependencies. The deeper co
 ### Recommended priority:
 
 Source 4 first — it's the highest-value, lowest-cost option and directly serves the app's load order tool. Sources 1-3 extend coverage to non-installed creations for proactive recommendations (e.g., "this patch exists for two mods you have installed").
+
+## Master Plan: Constraint-Based Load Order System
+
+### Constraint Hierarchy (single-pass solver)
+
+The load order solver resolves all constraints in a single topological sort. When constraints conflict, higher-priority source wins.
+
+```
+Priority  Source               Authority   Notes
+───────── ──────────────────── ─────────── ──────────────────────────────────────
+1 (top)   TES4 masters         MUST        Engine-enforced. Crash if violated.
+2         User rule books      SHOULD      User-created via rule book editor.
+                                           Stackable, ordered by user (higher
+                                           position = higher priority).
+3         Curated rule book    SHOULD      Project-provided (if shipped).
+                                           Sits below user books.
+4         Patch analysis       SHOULD      Auto-detected from catalogue
+                                           descriptions (feature 006 core).
+5         LOOT rules           SHOULD      Community-curated, possibly stale.
+6 (base)  Category tiers       PREFER      Heuristic grouping, cosmetic.
+```
+
+### Conflict Resolution
+
+When a higher-priority constraint contradicts a lower one (e.g., TES4 says a CAT3 plugin must load after a CAT5 plugin):
+- The higher-priority constraint wins — always
+- The affected plugin is moved down past its dependency, not the dependency moved up
+- A warning is emitted explaining the override (e.g., "ModA (Gear) placed after ModB (Quest) due to master dependency")
+- Philosophy: "load as early as your tier allows, but never before your masters"
+
+### Rule Book System
+
+**Storage**: JSON files in `%APPDATA%/StarfieldToolkit/rules/` (or `data/rules/` relative to app).
+
+**Discovery**: On startup, scan the rules directory for `.json` files. Newly discovered books are added at the bottom of the priority list (lowest priority among user books) until the user explicitly reorders them.
+
+**UI Components**:
+- **Rule Book Editor** (new tool/tab): Create and edit rule books. Each book contains a set of `load_after` constraints, warnings, and notes.
+- **Rule Book Manager** (part of editor or separate): Enable/disable individual books, drag to reorder priority. Shows: name, description, entry count, enabled/disabled toggle.
+
+**Rule Book Format** (conceptual):
+```json
+{
+  "name": "My Custom Rules",
+  "description": "Fixes for my personal mod list",
+  "version": "1.0",
+  "rules": [
+    {
+      "plugin": "SomeAddon.esm",
+      "load_after": ["BaseMod.esm"],
+      "note": "Addon patches records from BaseMod"
+    },
+    {
+      "plugin": "PatchAB.esm",
+      "load_after": ["ModA.esm", "ModB.esm"],
+      "note": "Compatibility patch, must load after both"
+    }
+  ]
+}
+```
+
+**Curated book**: If the project gains traction, a `curated-rules.json` can be shipped with the app (or fetched from the repo). It sits at priority 3, below any user-created books but above auto-detected patch analysis.
+
+### Implementation Phases
+
+**Phase A: TES4 Header Parser**
+- Parse MAST subrecords from local `.esm` files (~30 lines stdlib)
+- Integrate as highest-priority constraint source in existing solver
+- Zero network cost, instant, covers all installed plugins
+
+**Phase B: Patch Analysis (catalogue-based)**
+- Parse description text from catalogue for load order patterns
+- Detect `*.esm` filenames, plugin lists, informal mod name references
+- Generate `load_after` constraints from detected patterns
+- Use `plugin_summary.Files` from catalogue to map filenames ↔ content_ids
+
+**Phase C: Rule Book Engine**
+- Rule book file format and I/O (load/save JSON)
+- Rule book discovery (scan rules directory on startup)
+- Constraint merger integration (ordered priority)
+- Rule book manager UI (enable/disable, reorder)
+
+**Phase D: Rule Book Editor**
+- UI for creating/editing individual rule books
+- Add/remove/edit rules within a book
+- Validate plugin names against installed creations
+
+**Phase E: Curated Rule Book (if warranted)**
+- Project-maintained rule book with community-contributed rules
+- Shipped with app or fetched from repo
+- Auto-updates mechanism (optional)
 
 ## API Endpoint Reference
 

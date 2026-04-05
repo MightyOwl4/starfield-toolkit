@@ -31,6 +31,7 @@ class SortDecision:
     tier: int = 9  # default tier
     sorter_name: str = ""
     load_after: list[str] = field(default_factory=list)
+    load_after_sorters: dict[str, str] = field(default_factory=dict)  # dep → sorter name
     warnings: list[str] = field(default_factory=list)
 
 
