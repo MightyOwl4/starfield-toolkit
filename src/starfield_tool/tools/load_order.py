@@ -354,13 +354,18 @@ class LoadOrderTool(ToolModule):
             messagebox.showerror("Write Error", f"Cannot write Plugins.txt: {e}")
 
     def _validate_tes4_order(self):
-        """Check proposed order against TES4 master dependencies."""
+        """Check proposed order against TES4 master dependencies.
+
+        Returns list of violations, or empty list if order is valid.
+        Builds the master map on demand if not cached from auto-sort.
+        """
         from load_order_sorter.validation import validate_tes4_order
         from load_order_sorter.tes4_parser import build_master_map
 
         if not self._context or not self._context.game_installation:
             return []
 
+        # Build master map if not cached
         master_map = getattr(self, "_tes4_master_map", None)
         if master_map is None:
             data_dir = self._context.game_installation.data_dir
