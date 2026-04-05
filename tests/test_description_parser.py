@@ -1,0 +1,224 @@
+"""Tests for the description dependency parser."""
+from unittest.mock import MagicMock
+
+from description_parser.analyzer import (
+    build_reference_list,
+    filter_candidates,
+    generate_rulebook,
+    analyze_creation,
+)
+from description_parser.report import generate_report
+
+
+def _make_entry(title, description="", required_mods=None, plugin_summary=None):
+    return {
+        "title": title,
+        "description": description,
+        "required_mods": required_mods or [],
+        "plugin_summary": plugin_summary,
+    }
+
+
+# --- filter_candidates ---
+
+
+def test_filter_patch_in_title():
+    catalogue = {
+        "a": _make_entry("My Patch", "fixes things"),
+        "b": _make_entry("Cool Mod", "does stuff"),
+    }
+    result = filter_candidates(catalogue)
+    assert len(result) == 1
+    assert result[0]["title"] == "My Patch"
+
+
+def test_filter_required_mods():
+    catalogue = {
+        "a": _make_entry("Cool Mod", "desc", required_mods=["dep-id"]),
+    }
+    result = filter_candidates(catalogue)
+    assert len(result) == 1
+
+
+def test_filter_multiple_keywords():
+    catalogue = {
+        "a": _make_entry("Compatibility Fix", "desc"),
+        "b": _make_entry("Cool Addon", "desc"),
+        "c": _make_entry("Just a Mod", "desc"),
+    }
+    result = filter_candidates(catalogue)
+    assert len(result) == 2
+
+
+def test_filter_empty_description_skipped():
+    catalogue = {
+        "a": _make_entry("My Patch", ""),
+    }
+    result = filter_candidates(catalogue)
+    assert len(result) == 0
+
+
+def test_filter_empty_catalogue():
+    assert filter_candidates({}) == []
+
+
+def test_filter_extracts_plugin_file():
+    catalogue = {
+        "a": _make_entry(
+            "My Patch", "desc",
+            plugin_summary={"Files": ["Data\\MyPatch.esm", "Data\\MyPatch - Main.ba2"]},
+        ),
+    }
+    result = filter_candidates(catalogue)
+    assert result[0]["plugin_file"] == "MyPatch.esm"
+
+
+# --- build_reference_list ---
+
+
+def test_reference_list_includes_filenames():
+    catalogue = {
+        "a": _make_entry(
+            "Cool Mod",
+            plugin_summary={"Files": ["Data\\CoolMod.esm"]},
+        ),
+    }
+    ref = build_reference_list(catalogue)
+    assert "CoolMod.esm = Cool Mod" in ref
+
+
+def test_reference_list_no_summary_excluded():
+    catalogue = {
+        "a": _make_entry("Title Only"),
+    }
+    ref = build_reference_list(catalogue)
+    assert ref == ""  # no plugin files = excluded
+
+
+def test_reference_list_sorted():
+    catalogue = {
+        "z": _make_entry("Zebra Mod", plugin_summary={"Files": ["Data\\Zebra.esm"]}),
+        "a": _make_entry("Alpha Mod", plugin_summary={"Files": ["Data\\Alpha.esm"]}),
+    }
+    ref = build_reference_list(catalogue)
+    lines = ref.strip().split("\n")
+    assert lines[0].startswith("Alpha")
+    assert lines[1].startswith("Zebra")
+
+
+# --- analyze_creation (mocked) ---
+
+
+def test_analyze_creation_parses_response():
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text='{"dependencies": [{"source_plugin": "A.esm", "load_after": "B.esm", "matched_creation": "Mod B", "confidence": "high", "source_text": "load after B", "reasoning": "explicit"}]}')]
+    mock_client.messages.create.return_value = mock_response
+
+    deps = analyze_creation(mock_client, "desc", "ref list", "Mod A", "A.esm")
+    assert len(deps) == 1
+    assert deps[0]["source_plugin"] == "A.esm"
+    assert deps[0]["load_after"] == "B.esm"
+
+
+def test_analyze_creation_empty_deps():
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text='{"dependencies": []}')]
+    mock_client.messages.create.return_value = mock_response
+
+    deps = analyze_creation(mock_client, "no deps here", "ref list", "Mod", "mod.esm")
+    assert deps == []
+
+
+def test_analyze_creation_malformed_json():
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text="This is not JSON")]
+    mock_client.messages.create.return_value = mock_response
+
+    deps = analyze_creation(mock_client, "desc", "ref", "Mod", "mod.esm")
+    assert deps == []
+
+
+def test_analyze_creation_handles_code_block():
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text='```json\n{"dependencies": [{"source_plugin": "X.esm", "load_after": "Y.esm", "matched_creation": "Y", "confidence": "high", "source_text": "test", "reasoning": "test"}]}\n```')]
+    mock_client.messages.create.return_value = mock_response
+
+    deps = analyze_creation(mock_client, "desc", "ref", "X", "X.esm")
+    assert len(deps) == 1
+
+
+# --- generate_rulebook ---
+
+
+def test_rulebook_from_results():
+    results = [{
+        "content_id": "abc",
+        "title": "Patch",
+        "plugin_file": "Patch.esm",
+        "dependencies": [
+            {"source_plugin": "Patch.esm", "load_after": "Base.esm",
+             "confidence": "high", "source_text": "load order", "reasoning": "explicit"},
+        ],
+    }]
+    book = generate_rulebook(results)
+    assert book["name"] == "Auto-detected Patch Order Rules"
+    assert len(book["rules"]) == 1
+    assert book["rules"][0]["plugin"] == "Patch.esm"
+    assert book["rules"][0]["load_after"] == ["Base.esm"]
+
+
+def test_rulebook_deduplicates():
+    results = [
+        {"content_id": "a", "title": "A", "plugin_file": "A.esm",
+         "dependencies": [
+             {"source_plugin": "A.esm", "load_after": "B.esm", "confidence": "high",
+              "source_text": "", "reasoning": ""},
+         ]},
+        {"content_id": "a2", "title": "A2", "plugin_file": "A.esm",
+         "dependencies": [
+             {"source_plugin": "A.esm", "load_after": "B.esm", "confidence": "medium",
+              "source_text": "", "reasoning": ""},
+         ]},
+    ]
+    book = generate_rulebook(results)
+    assert len(book["rules"]) == 1  # deduplicated
+
+
+def test_rulebook_empty_results():
+    book = generate_rulebook([])
+    assert book["rules"] == []
+
+
+# --- generate_report ---
+
+
+def test_report_contains_sections(tmp_path):
+    results = [{
+        "content_id": "abc",
+        "title": "Test Patch",
+        "plugin_file": "test.esm",
+        "dependencies": [
+            {"source_plugin": "test.esm", "load_after": "base.esm",
+             "matched_creation": "Base Mod", "confidence": "high",
+             "source_text": "load after base", "reasoning": "explicit order"},
+        ],
+    }]
+    report_path = tmp_path / "report.md"
+    generate_report(results, report_path)
+
+    content = report_path.read_text(encoding="utf-8")
+    assert "High Confidence" in content
+    assert "Test Patch" in content
+    assert "Base Mod" in content
+    assert "explicit order" in content
+
+
+def test_report_empty_results(tmp_path):
+    report_path = tmp_path / "report.md"
+    generate_report([], report_path)
+    content = report_path.read_text(encoding="utf-8")
+    assert "**Total rules detected**: 0" in content

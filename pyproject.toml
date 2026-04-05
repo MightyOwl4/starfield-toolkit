@@ -22,6 +22,7 @@ packages = ["src/starfield_tool", "src/bethesda_creations", "src/load_order_sort
 dev = [
     "pytest>=8.0",
     "ruff>=0.15.8",
+    "anthropic>=0.50",
 ]
 
 [tool.pytest.ini_options]
