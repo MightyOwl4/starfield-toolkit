@@ -158,13 +158,25 @@ def run(argv: list[str] | None = None) -> int:
         f"({skipping} skipped)...",
         file=sys.stderr,
     )
-    results = process_candidates(
-        client, candidates, reference_list,
-        model=args.model,
-        max_entries=args.max_entries,
-        save_callback=_save_progress,
-        already_processed=already_processed,
-    )
+    try:
+        results = process_candidates(
+            client, candidates, reference_list,
+            model=args.model,
+            max_entries=args.max_entries,
+            save_callback=_save_progress,
+            already_processed=already_processed,
+        )
+    except Exception as exc:
+        status = getattr(exc, "status_code", None)
+        if status in {400, 401, 403}:
+            print(
+                f"\nFatal API error ({status}): {exc}\n"
+                "Run halted. Already-saved results are intact; "
+                "re-run after resolving the issue to resume.",
+                file=sys.stderr,
+            )
+            return 3
+        raise
 
     # Final save — merge with existing
     all_results = existing_results + results

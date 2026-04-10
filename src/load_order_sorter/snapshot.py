@@ -13,6 +13,19 @@ def save_snapshot(
     tool_version: str = "",
 ) -> None:
     """Write a load order snapshot to a JSON file."""
+    creations_payload = []
+    for e in entries:
+        item = {
+            "id": e.content_id,
+            "name": e.display_name,
+            "files": e.files,
+        }
+        # Only include version if known — older snapshots predate this field
+        # and shouldn't carry an empty value.
+        if e.installed_version:
+            item["version"] = e.installed_version
+        creations_payload.append(item)
+
     snapshot = {
         "name": name,
         "created": datetime.now(tz=timezone.utc).isoformat(),
@@ -21,14 +34,7 @@ def save_snapshot(
             "version": tool_version,
             "url": "https://github.com/MightyOwl4/starfield-toolkit",
         },
-        "creations": [
-            {
-                "id": e.content_id,
-                "name": e.display_name,
-                "files": e.files,
-            }
-            for e in entries
-        ],
+        "creations": creations_payload,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
@@ -62,6 +68,7 @@ def load_snapshot(path: Path) -> Snapshot:
                 content_id=item["id"],
                 display_name=item.get("name", ""),
                 files=item.get("files", []),
+                installed_version=item.get("version", ""),
             ))
     elif "plugins" in data:
         # Legacy format — bare filename list

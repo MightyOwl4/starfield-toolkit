@@ -6,6 +6,14 @@ import time
 
 log = logging.getLogger(__name__)
 
+# HTTP status codes that retries cannot fix. Hitting any of these means the
+# request, the auth, or the account is wrong (e.g. 400 from a depleted
+# credit balance, 401 from a bad key, 403 from a permission issue). We
+# re-raise these so the run halts BEFORE the failed creation is recorded as
+# "processed with no deps" — otherwise it would be silently skipped on the
+# next resume.
+_FATAL_API_STATUSES = frozenset({400, 401, 403})
+
 _failed_responses: list[dict] = []
 
 
@@ -219,7 +227,11 @@ def analyze_creation(
 
             try:
                 data = json.loads(text)
-                return data.get("dependencies", [])
+                deps = data.get("dependencies", [])
+                # The LLM occasionally returns malformed shapes (e.g. a list of
+                # bare strings). Drop anything that isn't a dependency object so
+                # the cache and downstream rulebook generation stay clean.
+                return [d for d in deps if isinstance(d, dict)]
             except json.JSONDecodeError:
                 # Try to recover complete dependency objects from truncated JSON
                 recovered = _recover_truncated_deps(text)
@@ -233,6 +245,18 @@ def analyze_creation(
                 _save_failed_response(creation_title, creation_plugin, text)
                 return []
         except Exception as exc:
+            # Fatal API errors: don't retry, don't swallow. Propagate so the
+            # run halts and the creation is left for the next attempt rather
+            # than being recorded as "processed with no deps" and skipped
+            # forever on resume.
+            status = getattr(exc, "status_code", None)
+            if status in _FATAL_API_STATUSES:
+                print(
+                    f"\r  Fatal API error ({status}) — halting run. "
+                    f"The current creation will be retried on the next run.",
+                    file=sys.stderr, flush=True,
+                )
+                raise
             if attempt < max_retries:
                 delay = 60 * (attempt + 1)  # 60s, 120s
                 print(
@@ -326,6 +350,11 @@ def generate_rulebook(results: list[dict]) -> dict:
 
     for result in results:
         for dep in result.get("dependencies", []):
+            # Defensive: cached results from older runs may contain malformed
+            # entries (e.g. a bare string the LLM returned by mistake). Skip
+            # them rather than crashing the whole save.
+            if not isinstance(dep, dict):
+                continue
             source = dep.get("source_plugin", "")
             after = dep.get("load_after", "")
             if not source or not after:

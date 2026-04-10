@@ -1,4 +1,5 @@
 """Tests for the description dependency parser."""
+import pytest
 from unittest.mock import MagicMock
 
 from description_parser.analyzer import (
@@ -7,6 +8,7 @@ from description_parser.analyzer import (
     build_reference_list,
     filter_candidates,
     generate_rulebook,
+    process_candidates,
 )
 from description_parser.report import generate_report
 
@@ -142,6 +144,80 @@ def test_analyze_creation_malformed_json():
     assert deps == []
 
 
+class _FakeAPIError(Exception):
+    """Mimics anthropic.APIStatusError — has a status_code attribute."""
+    def __init__(self, status_code, message="api error"):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def test_analyze_creation_fatal_400_propagates(monkeypatch):
+    """A 400 (e.g. depleted credits) must halt the run, NOT return []."""
+    # No real sleeps in the retry path
+    monkeypatch.setattr("description_parser.analyzer.time.sleep", lambda *_a, **_kw: None)
+
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = _FakeAPIError(400, "credit balance too low")
+
+    with pytest.raises(_FakeAPIError) as exc_info:
+        analyze_creation(mock_client, "desc", "ref", "Mod", "mod.esm")
+    assert exc_info.value.status_code == 400
+    # Must NOT have retried — fatal errors should fail fast
+    assert mock_client.messages.create.call_count == 1
+
+
+def test_analyze_creation_fatal_401_propagates(monkeypatch):
+    """A 401 (bad auth) must also halt immediately."""
+    monkeypatch.setattr("description_parser.analyzer.time.sleep", lambda *_a, **_kw: None)
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = _FakeAPIError(401, "auth")
+    with pytest.raises(_FakeAPIError):
+        analyze_creation(mock_client, "desc", "ref", "Mod", "mod.esm")
+    assert mock_client.messages.create.call_count == 1
+
+
+def test_analyze_creation_transient_error_still_retries(monkeypatch):
+    """Non-fatal errors (no status_code, or 5xx) keep the retry behaviour."""
+    monkeypatch.setattr("description_parser.analyzer.time.sleep", lambda *_a, **_kw: None)
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = RuntimeError("transient")
+    deps = analyze_creation(
+        mock_client, "desc", "ref", "Mod", "mod.esm", max_retries=2,
+    )
+    assert deps == []
+    # Initial + 2 retries = 3 calls
+    assert mock_client.messages.create.call_count == 3
+
+
+def test_process_candidates_does_not_save_on_fatal_error(monkeypatch):
+    """A fatal API error must propagate out of process_candidates BEFORE
+    save_callback runs — otherwise the failing creation gets baked into the
+    resume cache and skipped on subsequent runs."""
+    monkeypatch.setattr("description_parser.analyzer.time.sleep", lambda *_a, **_kw: None)
+
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = _FakeAPIError(400, "credit balance too low")
+
+    saved = []
+
+    def _save(results):
+        saved.append(list(results))
+
+    candidates = [
+        {"content_id": "id-1", "title": "Patch A", "description": "desc",
+         "plugin_file": "a.esm"},
+    ]
+
+    with pytest.raises(_FakeAPIError):
+        process_candidates(
+            mock_client, candidates, "ref list", save_callback=_save,
+        )
+
+    # Crucial: save_callback must NOT have been called — otherwise the
+    # creation would be marked as processed and skipped on resume.
+    assert saved == []
+
+
 def test_analyze_creation_handles_code_block():
     mock_client = MagicMock()
     mock_response = MagicMock()
@@ -232,6 +308,45 @@ def test_rulebook_deduplicates():
 def test_rulebook_empty_results():
     book = generate_rulebook([])
     assert book["rules"] == []
+
+
+def test_rulebook_skips_non_dict_dependencies():
+    """Older cache files may contain malformed entries (e.g. bare strings).
+    generate_rulebook must not crash on them."""
+    results = [{
+        "content_id": "abc",
+        "title": "Patch",
+        "plugin_file": "Patch.esm",
+        "dependencies": [
+            "junk string from a bad LLM response",
+            None,
+            42,
+            {"source_plugin": "Patch.esm", "load_after": "Base.esm",
+             "confidence": "high", "source_text": "", "reasoning": ""},
+        ],
+    }]
+    book = generate_rulebook(results)
+    assert len(book["rules"]) == 1
+    assert book["rules"][0]["plugin"] == "Patch.esm"
+
+
+def test_analyze_creation_filters_non_dict_deps():
+    """LLM returning a malformed dependencies array is sanitised before save."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=(
+        '{"dependencies": ['
+        '"some bare string", '
+        '{"source_plugin": "A.esm", "load_after": "B.esm", '
+        '"confidence": "high", "source_text": "x", "reasoning": "y"}, '
+        'null'
+        ']}'
+    ))]
+    mock_client.messages.create.return_value = mock_response
+
+    deps = analyze_creation(mock_client, "desc", "ref", "Mod", "mod.esm")
+    assert len(deps) == 1
+    assert deps[0]["source_plugin"] == "A.esm"
 
 
 # --- generate_report ---

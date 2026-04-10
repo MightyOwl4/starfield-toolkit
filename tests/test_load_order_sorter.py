@@ -284,6 +284,43 @@ class TestSnapshot:
         except ValueError:
             pass
 
+    def test_round_trip_with_versions(self, tmp_path):
+        """installed_version round-trips through save/load."""
+        from load_order_sorter.models import SnapshotEntry
+        path = tmp_path / "snapshot.json"
+        entries = [
+            SnapshotEntry("id-1", "Mod A", ["a.esm"], installed_version="1.2.3"),
+            SnapshotEntry("id-2", "Mod B", ["b.esm"], installed_version="2.0"),
+        ]
+        save_snapshot("Versioned", entries, path, "1.0")
+
+        snap = load_snapshot(path)
+        assert snap.entries[0].installed_version == "1.2.3"
+        assert snap.entries[1].installed_version == "2.0"
+
+    def test_save_omits_empty_version(self, tmp_path):
+        """Entries with no version don't write a 'version' key (keeps file lean)."""
+        from load_order_sorter.models import SnapshotEntry
+        path = tmp_path / "snapshot.json"
+        save_snapshot("test", [
+            SnapshotEntry("id-1", "Mod A", ["a.esm"]),  # no version
+        ], path, "1.0")
+
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        assert "version" not in raw["creations"][0]
+
+    def test_legacy_snapshot_without_version_field_loads(self, tmp_path):
+        """Snapshots saved before the version field gain an empty value."""
+        f = tmp_path / "old.json"
+        f.write_text(json.dumps({
+            "name": "old",
+            "creations": [
+                {"id": "id-1", "name": "Mod A", "files": ["a.esm"]},
+            ],
+        }), encoding="utf-8")
+        snap = load_snapshot(f)
+        assert snap.entries[0].installed_version == ""
+
 
 class TestMergePartial:
     """Tests for the diff dialog's partial-accept merge logic."""

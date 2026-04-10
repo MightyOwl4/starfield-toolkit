@@ -60,6 +60,7 @@ class SnapshotEntry:
     content_id: str
     display_name: str
     files: list[str] = field(default_factory=list)
+    installed_version: str = ""
 
 
 @dataclass
