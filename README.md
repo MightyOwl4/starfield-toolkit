@@ -11,6 +11,17 @@ Starfield Toolkit is a lightweight Windows GUI to help managing official Bethesd
 The sole reason for its existence is that some operations are frustratingly non-user-friendly in-game and on the site, e.g. you have no other way to check for pending updates than walking through all creations in your library one by one.
 This toolbox tries to provide solutions to issues like this without messing with the game itself.
 
+# System requirements
+1. **Windows**
+2. Starfield installed via Steam
+3. Using only mods from the Bethesda official creations store
+
+No other options are supported, nor planned.
+
+> **Mods from Nexus or other sources, installed manually or via Vortex/MO2 WILL BREAK the app !**
+> It heavily relies on information from the creations pages to do its job, missing that will result in unexpected behaviour
+
+
 # Download
 
 Grab the latest `StarfieldToolkit.exe` from [Releases](https://github.com/MightyOwl4/starfield-toolkit/releases/latest).
