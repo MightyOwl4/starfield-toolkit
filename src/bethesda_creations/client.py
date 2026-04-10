@@ -20,7 +20,8 @@ from bethesda_creations._cache import (
 class ClientConfig:
     """Configuration for the Creations API client."""
     cache_path: Path | None = None
-    session_start_time: float = 0.0
+    session_start_time: float = 0.0  # time.monotonic() at session start
+    session_start_wall: float = 0.0  # time.time() at session start (unix epoch)
     session_window: int = 1800  # 30 minutes
     request_timeout: int = 15
     progress_callback: Callable[[str], None] | None = None
@@ -44,18 +45,25 @@ class CreationsClient:
     ) -> dict[str, CreationInfo]:
         """Fetch metadata for creations, using cache where possible.
 
+        A cache entry is only reused if it was fetched DURING the current
+        session. Entries from previous sessions are revalidated via the API.
+        This means the first call in a session always makes network requests
+        (to refresh stale data), and subsequent calls within the session reuse
+        the freshly fetched data without extra API traffic.
+
         Returns a dict mapping content_id -> CreationInfo.
         """
         cfg = self._config
         cache = self._load_cache()
-        session_fresh = self._is_session_fresh()
         results: dict[str, CreationInfo] = {}
         needs_fetch: list[ContentQuery] = []
 
-        # Resolve from cache
+        # Resolve from cache: an entry is "session-fresh" only if it was
+        # fetched during the current session (fetched_at >= session_start_wall).
+        # Pre-existing cache entries from previous sessions must be revalidated.
         for q in queries:
             entry = cache.get(q.content_id)
-            if entry and session_fresh:
+            if entry and self._entry_is_session_fresh(entry):
                 results[q.content_id] = entry_to_info(entry)
             else:
                 needs_fetch.append(q)
@@ -113,17 +121,17 @@ class CreationsClient:
     ) -> dict[str, CreationInfo]:
         """Return cached data only (no network calls).
 
-        Returns entries that exist in cache and are within the session
-        window. Returns empty dict if caching is disabled or cache
-        is missing.
+        Returns only entries that were fetched during the current session
+        (fetched_at >= session_start_wall). Entries from previous sessions
+        are excluded to avoid serving stale data.
         """
         cache = self._load_cache()
-        if not cache or not self._is_session_fresh():
+        if not cache:
             return {}
         results: dict[str, CreationInfo] = {}
         for cid in content_ids:
             entry = cache.get(cid)
-            if entry:
+            if entry and self._entry_is_session_fresh(entry):
                 results[cid] = entry_to_info(entry)
         return results
 
@@ -145,3 +153,17 @@ class CreationsClient:
         return is_session_fresh(
             self._config.session_start_time, self._config.session_window,
         )
+
+    def _entry_is_session_fresh(self, entry: dict) -> bool:
+        """True if the entry was fetched during the current session window.
+
+        Checks:
+        1. We're still within the session window (monotonic time)
+        2. The entry's fetched_at (wall-clock) is >= session_start_wall
+           — i.e., it was fetched AFTER the current session started, not
+           left over from a previous session's cache.
+        """
+        if not self._is_session_fresh():
+            return False
+        fetched_at = entry.get("fetched_at", 0) or 0
+        return fetched_at >= self._config.session_start_wall

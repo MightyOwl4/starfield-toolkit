@@ -64,6 +64,7 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._app_start_time = time.monotonic()
+        self._app_start_wall = time.time()
         self._game_install: GameInstallation | None = None
         self._module_instances: list = []
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
@@ -273,6 +274,7 @@ class App(ctk.CTk):
                 status_bar=self._status_bar,
                 content_frame=content,
                 app_start_time=self._app_start_time,
+                app_start_wall=self._app_start_wall,
             )
             module.initialize(context)
             self._module_instances.append(module)

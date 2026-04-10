@@ -20,6 +20,7 @@ class _CreationGroup:
     files: list[str] = field(default_factory=list)  # all plugin files in order
     content_id: str = ""
     categories: list[str] = field(default_factory=list)
+    installed_version: str = ""
 
     @property
     def plugin_label(self) -> str:
@@ -215,6 +216,7 @@ class LoadOrderTool(ToolModule):
                     display_name=entry.title,
                     files=entry_files,
                     content_id=entry.content_id,
+                    installed_version=entry.version,
                 ))
             elif entry is None:
                 # Plugin not in catalog — standalone
@@ -439,6 +441,7 @@ class LoadOrderTool(ToolModule):
                 client = _make_client(
                     self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 queries = [
                     ContentQuery(
@@ -622,6 +625,7 @@ class LoadOrderTool(ToolModule):
                 content_id=g.content_id or g.key,
                 display_name=g.display_name,
                 files=g.files,
+                installed_version=g.installed_version,
             )
             for g in self._working_groups
         ]

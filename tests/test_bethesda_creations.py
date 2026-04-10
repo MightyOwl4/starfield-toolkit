@@ -3,6 +3,7 @@ import json
 import time
 from pathlib import Path
 
+from bethesda_creations import CreationsClient, ClientConfig, ContentQuery
 from bethesda_creations.models import CreationInfo
 from bethesda_creations._api import parse_response, content_id_to_uuid
 from bethesda_creations._cache import (
@@ -168,3 +169,137 @@ class TestEntryConversion:
         assert merged.author == "Cached"
         assert merged.version == "2.0"
         assert merged.price == 500
+
+
+class TestSessionFreshness:
+    """Per-entry session freshness: cache from previous sessions must be revalidated."""
+
+    def _write_cache_entry(self, tmp_path, content_id, fetched_at):
+        cache_path = tmp_path / "cache.json"
+        entries = {
+            content_id: {
+                "fetched_at": fetched_at,
+                "title": "Test Mod",
+                "author": "Author",
+                "version": "1.0",
+                "categories": [],
+                "achievement_friendly": False,
+                "price": 0,
+            }
+        }
+        save_cache(entries, cache_path)
+        return cache_path
+
+    def test_get_cached_returns_entry_fetched_in_session(self, tmp_path):
+        """Entry fetched after session start should be returned by get_cached."""
+        now_wall = time.time()
+        cache_path = self._write_cache_entry(
+            tmp_path, "id-1", fetched_at=now_wall + 5,
+        )
+        client = CreationsClient(ClientConfig(
+            cache_path=cache_path,
+            session_start_time=time.monotonic(),
+            session_start_wall=now_wall,
+        ))
+        result = client.get_cached(["id-1"])
+        assert "id-1" in result
+        assert result["id-1"].title == "Test Mod"
+
+    def test_get_cached_excludes_entry_from_previous_session(self, tmp_path):
+        """Entry fetched before session start must NOT be returned by get_cached."""
+        now_wall = time.time()
+        # Entry fetched 1 hour before session start
+        cache_path = self._write_cache_entry(
+            tmp_path, "id-1", fetched_at=now_wall - 3600,
+        )
+        client = CreationsClient(ClientConfig(
+            cache_path=cache_path,
+            session_start_time=time.monotonic(),
+            session_start_wall=now_wall,
+        ))
+        result = client.get_cached(["id-1"])
+        assert result == {}
+
+    def test_get_cached_excludes_when_session_expired(self, tmp_path):
+        """Even an entry fetched in-session is excluded once the window expires."""
+        now_wall = time.time()
+        cache_path = self._write_cache_entry(
+            tmp_path, "id-1", fetched_at=now_wall + 5,
+        )
+        # Session started > 30 min ago (monotonic-wise)
+        client = CreationsClient(ClientConfig(
+            cache_path=cache_path,
+            session_start_time=time.monotonic() - 2000,
+            session_start_wall=now_wall,
+            session_window=1800,
+        ))
+        result = client.get_cached(["id-1"])
+        assert result == {}
+
+    def test_fetch_info_marks_stale_entries_for_refetch(self, tmp_path, monkeypatch):
+        """fetch_info must put cache-stale entries into the needs_fetch list,
+        not blindly reuse them just because the session window is open."""
+        now_wall = time.time()
+        cache_path = self._write_cache_entry(
+            tmp_path, "id-1", fetched_at=now_wall - 3600,
+        )
+        client = CreationsClient(ClientConfig(
+            cache_path=cache_path,
+            session_start_time=time.monotonic(),
+            session_start_wall=now_wall,
+        ))
+
+        # Stub the network bits — we only want to know that fetch was attempted.
+        fetched: list[str] = []
+
+        def fake_fetch_bnet_key(timeout):
+            return "fake-key"
+
+        def fake_content_id_to_uuid(cid):
+            fetched.append(cid)
+            return None  # forces the search path / skip — we just want to confirm we got here
+
+        monkeypatch.setattr(
+            "bethesda_creations.client.fetch_bnet_key", fake_fetch_bnet_key,
+        )
+        monkeypatch.setattr(
+            "bethesda_creations.client.content_id_to_uuid", fake_content_id_to_uuid,
+        )
+        monkeypatch.setattr(
+            "bethesda_creations.client.search_uuid_by_title", lambda c, t: None,
+        )
+
+        client.fetch_info([ContentQuery(content_id="id-1", display_name="Test Mod")])
+
+        assert fetched == ["id-1"], (
+            "Expected fetch_info to attempt re-fetching the previous-session entry"
+        )
+
+    def test_fetch_info_reuses_in_session_entries(self, tmp_path, monkeypatch):
+        """Entries fetched during the current session must NOT trigger network calls."""
+        now_wall = time.time()
+        cache_path = self._write_cache_entry(
+            tmp_path, "id-1", fetched_at=now_wall + 5,
+        )
+        client = CreationsClient(ClientConfig(
+            cache_path=cache_path,
+            session_start_time=time.monotonic(),
+            session_start_wall=now_wall,
+        ))
+
+        called = {"bnet": False}
+
+        def fake_fetch_bnet_key(timeout):
+            called["bnet"] = True
+            return "fake-key"
+
+        monkeypatch.setattr(
+            "bethesda_creations.client.fetch_bnet_key", fake_fetch_bnet_key,
+        )
+
+        result = client.fetch_info(
+            [ContentQuery(content_id="id-1", display_name="Test Mod")]
+        )
+        assert called["bnet"] is False, "Should not have hit network"
+        assert "id-1" in result
+        assert result["id-1"].version == "1.0"

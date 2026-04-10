@@ -280,7 +280,10 @@ class CreationLoadOrderTool(ToolModule):
         from starfield_tool.creations import get_cached_info
         from bethesda_creations._version_cmp import compare_versions
 
-        cached = get_cached_info(self._context.app_start_time)
+        cached = get_cached_info(
+            self._context.app_start_time,
+            self._context.app_start_wall,
+        )
         if not cached:
             self._checked = False
             self._achievements_checked = False
@@ -380,6 +383,7 @@ class CreationLoadOrderTool(ToolModule):
                 updated = check_for_updates(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 # Schedule UI update on the main thread
                 self._tree.after(0, lambda: self._on_updates_complete(updated))
@@ -458,6 +462,7 @@ class CreationLoadOrderTool(ToolModule):
                 updated = check_achievements(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 self._tree.after(0, lambda: self._on_achievements_complete(updated))
             except Exception:
@@ -862,6 +867,7 @@ class CreationLoadOrderTool(ToolModule):
                 check_for_updates(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 if self._media_frame and self._media_frame.winfo_exists():
                     self._media_frame.after(0, self._on_cache_fetch_complete)
@@ -925,9 +931,12 @@ class CreationLoadOrderTool(ToolModule):
         for c in self._creations:
             pos = str(c.load_position + 1) if c.load_position is not None else "-"
             date = c.timestamp.strftime("%d %b %Y") if c.timestamp else ""
-            rows.append((pos, c.display_name, c.author, c.installed_version, date))
+            rows.append((
+                pos, c.content_id, c.display_name, c.author,
+                c.installed_version, date,
+            ))
 
-        headers = ("#", "Name", "Author", "Version", "Date")
+        headers = ("#", "Content ID", "Name", "Author", "Installed Version", "Date")
 
         if path.endswith(".csv"):
             import csv
