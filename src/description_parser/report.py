@@ -8,6 +8,7 @@ def generate_report(results: list[dict], output_path: Path) -> None:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     total_deps = sum(len(r.get("dependencies", [])) for r in results)
+    with_deps = sum(1 for r in results if r.get("dependencies"))
     by_confidence = {"high": [], "medium": [], "low": []}
 
     for result in results:
@@ -21,7 +22,8 @@ def generate_report(results: list[dict], output_path: Path) -> None:
         "# Description Dependency Analysis Report",
         "",
         f"**Generated**: {now}",
-        f"**Creations with dependencies**: {len(results)}",
+        f"**Creations analyzed**: {len(results)}",
+        f"**Creations with dependencies**: {with_deps}",
         f"**Total rules detected**: {total_deps}",
         f"**High confidence**: {len(by_confidence['high'])}",
         f"**Medium confidence**: {len(by_confidence['medium'])}",

@@ -22,9 +22,15 @@ Confidence levels:
 - "medium": Named creation with clear ordering language and confident match
 - "low": Informal reference, abbreviation, or ambiguous match
 
-IMPORTANT: Only return dependencies you find evidence for in the description. Do not invent dependencies. If no ordering information is found, return an empty dependencies array.
+IMPORTANT RULES:
+1. Only return dependencies you find evidence for in the description. Do not invent dependencies.
+2. If no ordering information is found, return {"dependencies": []} - empty array, no commentary.
+3. If you cannot match a referenced mod to the reference list, SKIP it entirely - do not add it with a guessed filename, do not explain why you couldn't match it. Just skip.
+4. Keep "source_text" under 80 characters (truncate long quotes).
+5. Keep "reasoning" under 120 characters (be concise).
+6. If the source creation references many dependencies (more than 8), prioritize the ones you can confidently match from the reference list.
 
-Return ONLY valid JSON matching this schema:
+CRITICAL: Return ONLY the raw JSON object below. No markdown, no code fences, no commentary before or after. Just the JSON. Never write prose explanations outside the JSON. If uncertain, return empty dependencies array.
 {
   "dependencies": [
     {
@@ -54,5 +60,6 @@ def build_user_message(
         f"## Description\n"
         f"{description}\n\n"
         f"## Known Creations Reference List\n"
-        f"{reference_list}"
+        f"{reference_list}\n\n"
+        f"Respond with ONLY the JSON object. No other text."
     )

@@ -16,6 +16,7 @@ from description_parser.analyzer import (
     build_reference_list,
     filter_candidates,
     generate_rulebook,
+    get_failed_responses,
     process_candidates,
 )
 from description_parser.report import generate_report
@@ -118,35 +119,86 @@ def run(argv: list[str] | None = None) -> int:
         )
         generate_report(current_results, report_path)
 
+    # Load existing results to skip already-processed creations
+    existing_results = []
+    results_cache_path = data_dir / "patch_order_results.json"
+    already_processed = set()
+    if results_cache_path.exists():
+        try:
+            existing_results = json.loads(
+                results_cache_path.read_text(encoding="utf-8")
+            )
+            already_processed = {r["content_id"] for r in existing_results}
+            print(
+                f"Resuming: {len(already_processed)} already processed, skipping",
+                file=sys.stderr,
+            )
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    def _save_progress(current_results):
+        """Incremental save — called after each successful extraction."""
+        all_results = existing_results + current_results
+        rb = generate_rulebook(all_results)
+        rulebook_path.parent.mkdir(parents=True, exist_ok=True)
+        rulebook_path.write_text(
+            json.dumps(rb, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        generate_report(all_results, report_path)
+        # Also save raw results for resume
+        results_cache_path.write_text(
+            json.dumps(all_results, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
     # Process
-    print(f"\nProcessing {total} candidates with {args.model}...", file=sys.stderr)
+    skipping = len(already_processed)
+    remaining = total - skipping
+    print(
+        f"\nProcessing {remaining} candidates with {args.model} "
+        f"({skipping} skipped)...",
+        file=sys.stderr,
+    )
     results = process_candidates(
         client, candidates, reference_list,
         model=args.model,
         max_entries=args.max_entries,
         save_callback=_save_progress,
+        already_processed=already_processed,
     )
 
-    # Final save
-    rulebook = generate_rulebook(results)
+    # Final save — merge with existing
+    all_results = existing_results + results
+    rulebook = generate_rulebook(all_results)
     rulebook_path.parent.mkdir(parents=True, exist_ok=True)
     rulebook_path.write_text(
         json.dumps(rulebook, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    generate_report(results, report_path)
+    generate_report(all_results, report_path)
+    results_cache_path.write_text(
+        json.dumps(all_results, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
     # Summary
     total_rules = len(rulebook.get("rules", []))
-    total_deps = sum(len(r.get("dependencies", [])) for r in results)
-    creations_with_deps = len(results)
+    total_deps = sum(len(r.get("dependencies", [])) for r in all_results)
+    creations_with_deps = sum(1 for r in all_results if r.get("dependencies"))
 
     print("\nDone:")
-    print(f"  Candidates analyzed: {total}")
+    print(f"  Candidates analyzed: {len(all_results)}")
     print(f"  Creations with dependencies: {creations_with_deps}")
     print(f"  Total dependencies found: {total_deps}")
     print(f"  Rules in rule book: {total_rules}")
     print(f"  Rule book: {rulebook_path}")
     print(f"  Report: {report_path}")
+
+    # Save failed responses for recovery
+    failed = get_failed_responses()
+    if failed:
+        failed_path = data_dir / "patch_order_failed.json"
+        failed_path.write_text(
+            json.dumps(failed, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"  Failed responses: {len(failed)} saved to {failed_path}")
 
     return 0
 

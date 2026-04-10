@@ -6,6 +6,94 @@ import time
 
 log = logging.getLogger(__name__)
 
+_failed_responses: list[dict] = []
+
+
+def _save_failed_response(title: str, plugin: str, raw_text: str) -> None:
+    """Collect failed LLM responses for later recovery."""
+    _failed_responses.append({
+        "title": title,
+        "plugin": plugin,
+        "raw_response": raw_text,
+    })
+
+
+def get_failed_responses() -> list[dict]:
+    """Return all collected failed responses."""
+    return _failed_responses
+
+
+def _recover_truncated_deps(text: str) -> list[dict]:
+    """Extract complete dependency objects from a truncated JSON response.
+
+    When max_tokens is reached mid-response, the JSON is cut off. But all
+    complete dependency objects inside the array before the cut are valid
+    and can be salvaged.
+
+    Strategy: find the start of the dependencies array, then iterate
+    through looking for complete balanced {...} objects and try to parse
+    each individually.
+    """
+    # Find the dependencies array
+    idx = text.find('"dependencies"')
+    if idx < 0:
+        return []
+
+    # Find the opening bracket
+    bracket = text.find("[", idx)
+    if bracket < 0:
+        return []
+
+    recovered = []
+    i = bracket + 1
+    while i < len(text):
+        # Skip whitespace and commas
+        while i < len(text) and text[i] in ' \t\n\r,':
+            i += 1
+        if i >= len(text) or text[i] != "{":
+            break
+
+        # Find matching closing brace, respecting strings
+        depth = 0
+        in_string = False
+        escape = False
+        start = i
+        end = -1
+        while i < len(text):
+            ch = text[i]
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = not in_string
+            elif not in_string:
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+            i += 1
+
+        if end < 0:
+            # Incomplete object — give up
+            break
+
+        obj_text = text[start:end]
+        try:
+            obj = json.loads(obj_text)
+            if isinstance(obj, dict):
+                recovered.append(obj)
+        except json.JSONDecodeError:
+            break
+
+        i = end
+
+    return recovered
+
+
 # Keywords that suggest a creation may contain dependency info
 _CANDIDATE_KEYWORDS = ("patch", "compatibility", "addon", "fix")
 
@@ -93,7 +181,7 @@ def analyze_creation(
         try:
             response = client.messages.create(
                 model=model,
-                max_tokens=1024,
+                max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_msg}],
             )
@@ -129,12 +217,21 @@ def analyze_creation(
                                 text = text[:j + 1]
                                 break
 
-            data = json.loads(text)
-            return data.get("dependencies", [])
-
-        except json.JSONDecodeError:
-            log.warning("Malformed JSON from LLM for %s", creation_title)
-            return []
+            try:
+                data = json.loads(text)
+                return data.get("dependencies", [])
+            except json.JSONDecodeError:
+                # Try to recover complete dependency objects from truncated JSON
+                recovered = _recover_truncated_deps(text)
+                if recovered:
+                    log.info(
+                        "Recovered %d dependencies from truncated JSON for %s",
+                        len(recovered), creation_title,
+                    )
+                    return recovered
+                log.warning("Malformed JSON from LLM for %s", creation_title)
+                _save_failed_response(creation_title, creation_plugin, text)
+                return []
         except Exception as exc:
             if attempt < max_retries:
                 delay = 60 * (attempt + 1)  # 60s, 120s
@@ -156,28 +253,46 @@ def process_candidates(
     model: str = "claude-sonnet-4-6",
     max_entries: int | None = None,
     save_callback=None,
+    already_processed: set[str] | None = None,
 ) -> list[dict]:
     """Process all candidates through the LLM, collecting results.
 
     Args:
-        save_callback: Optional function called every 10 results with
-            the current results list, for incremental saving.
+        save_callback: Optional function called after each successful
+            extraction, for incremental saving.
+        already_processed: Set of content_ids already in the rule book.
+            These are skipped to avoid redundant API calls.
 
     Returns list of {content_id, title, plugin_file, dependencies[]}.
     """
+    skip_set = already_processed or set()
     results = []
     total = min(len(candidates), max_entries) if max_entries else len(candidates)
 
-    for i, candidate in enumerate(candidates[:total]):
-        # In-place progress
+    # Count how many candidates actually need processing
+    to_process = [
+        c for c in candidates[:total]
+        if c["content_id"] not in skip_set
+    ]
+    remaining_total = len(to_process)
+    processed = 0
+
+    for candidate in candidates[:total]:
+        # Skip already-processed creations (silent, no counter bump)
+        if candidate["content_id"] in skip_set:
+            continue
+
+        processed += 1
+
+        # In-place progress (only counts non-skipped)
         print(
-            f"\r[{i + 1} of {total}] Analyzing: {candidate['title'][:50]}...",
+            f"\r[{processed} of {remaining_total}] Analyzing: {candidate['title'][:50]}...",
             end="", file=sys.stderr, flush=True,
         )
 
         # Rate limit pacing: reference list is ~48K tokens per request.
         # Tier 3 allows 120K input tokens/min — ~30s between calls is safe.
-        if i > 0:
+        if processed > 1:
             time.sleep(30)
 
         deps = analyze_creation(
@@ -189,15 +304,15 @@ def process_candidates(
             model=model,
         )
 
-        if deps:
-            results.append({
-                "content_id": candidate["content_id"],
-                "title": candidate["title"],
-                "plugin_file": candidate.get("plugin_file", ""),
-                "dependencies": deps,
-            })
+        # Record the result — even empty ones so we don't re-process them
+        results.append({
+            "content_id": candidate["content_id"],
+            "title": candidate["title"],
+            "plugin_file": candidate.get("plugin_file", ""),
+            "dependencies": deps,  # may be empty list
+        })
 
-        if save_callback and deps:
+        if save_callback:
             save_callback(results)
 
     print("", file=sys.stderr)  # newline after progress

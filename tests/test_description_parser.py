@@ -2,10 +2,11 @@
 from unittest.mock import MagicMock
 
 from description_parser.analyzer import (
+    _recover_truncated_deps,
+    analyze_creation,
     build_reference_list,
     filter_candidates,
     generate_rulebook,
-    analyze_creation,
 )
 from description_parser.report import generate_report
 
@@ -149,6 +150,46 @@ def test_analyze_creation_handles_code_block():
 
     deps = analyze_creation(mock_client, "desc", "ref", "X", "X.esm")
     assert len(deps) == 1
+
+
+# --- _recover_truncated_deps ---
+
+
+def test_recover_truncated_mid_object():
+    """Response truncated in the middle of the 3rd dependency."""
+    text = '''{"dependencies": [
+        {"source_plugin": "A.esm", "load_after": "B.esm", "confidence": "high", "reasoning": "explicit"},
+        {"source_plugin": "A.esm", "load_after": "C.esm", "confidence": "high", "reasoning": "explicit"},
+        {"source_plugin": "A.esm", "load_after": "D.esm", "confidence": "me'''
+    recovered = _recover_truncated_deps(text)
+    assert len(recovered) == 2
+    assert recovered[0]["source_plugin"] == "A.esm"
+    assert recovered[0]["load_after"] == "B.esm"
+    assert recovered[1]["load_after"] == "C.esm"
+
+
+def test_recover_truncated_complete_but_unterminated_array():
+    """All objects complete but the array is not closed."""
+    text = '{"dependencies": [{"source_plugin": "A.esm", "load_after": "B.esm"}, {"source_plugin": "A.esm", "load_after": "C.esm"}'
+    recovered = _recover_truncated_deps(text)
+    assert len(recovered) == 2
+
+
+def test_recover_no_dependencies_key():
+    assert _recover_truncated_deps("some random text") == []
+
+
+def test_recover_empty_array():
+    text = '{"dependencies": []'
+    assert _recover_truncated_deps(text) == []
+
+
+def test_recover_handles_escaped_quotes_in_strings():
+    """String contains braces and quotes that could confuse the parser."""
+    text = '{"dependencies": [{"source_plugin": "A.esm", "load_after": "B.esm", "source_text": "quote with \\"braces {}\\" inside"}]}'
+    recovered = _recover_truncated_deps(text)
+    assert len(recovered) == 1
+    assert 'braces' in recovered[0]["source_text"]
 
 
 # --- generate_rulebook ---

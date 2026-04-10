@@ -10,7 +10,12 @@
 ### Session 2026-04-05
 
 - Q: Should the parser use regex or LLM-based extraction? → A: LLM-based (Anthropic API, Sonnet model). Regex can detect patterns but cannot reliably match informal creation references (abbreviations like "PDY", partial names like "Watchtower", author self-references). The LLM receives the description plus a list of known creations and performs both detection and entity resolution in one pass.
-- Q: Cost estimate? → A: ~$3-5 for processing ~618 patch creations with Sonnet, including full creation title list for matching. Well within acceptable budget for an occasional offline tool.
+- Q: Cost estimate? → A: ~$3-5 was the initial estimate but actual cost is ~$165 per full run (~1,136 candidates × ~48K reference list tokens per request). The reference list is sent with every request for entity resolution. Acceptable given this is an occasional offline tool and credits are prepaid.
+- Q: Which candidate filter keywords? → A: title contains "patch", "compatibility", "addon", "fix" (case-insensitive) OR `required_mods` is non-empty. Filters ~4,954 creations down to ~1,136 candidates.
+- Q: How to handle API rate limits? → A: Tier 3 (120K input tokens/min) required for practical throughput. 30-second sleep between API calls keeps usage under the limit. Lower tiers require longer delays (Tier 1: 120s, Tier 2: 60s).
+- Q: How to handle multi-pass runs and resume after crashes? → A: Save ALL analyzed creations to a results cache file (`patch_order_results.json`), including those with empty dependency lists. On next run, the cached content_ids form a skip set so previously-analyzed creations are not re-processed — regardless of whether they had dependencies or not.
+- Q: How to handle truncated LLM responses when max_tokens is exceeded? → A: Use `max_tokens=4096` as baseline (sufficient for ~20 dependencies per response). When JSON is still truncated, attempt recovery by parsing complete dependency objects from the partial array — string-aware brace matching extracts whatever complete objects exist before the cut.
+- Q: How to prevent LLM from returning prose instead of JSON for ambiguous cases? → A: Tightened prompt rules: "if uncertain return empty array", "never write prose outside JSON", "skip unmatched references without explanation", "truncate source_text to 80 chars, reasoning to 120 chars", "prioritize confident matches if more than 8 deps".
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -65,7 +70,11 @@ Each detected rule is assigned a confidence level (high, medium, low) by the LLM
 - What happens when the LLM finds contradictory ordering hints in different descriptions? Both rules are generated — the rule book engine and solver handle conflict resolution.
 - What happens when the catalogue is missing? The parser exits with an error instructing the user to run the catalogue scraper first.
 - What happens when the API key is missing or invalid? The parser exits with a clear error message about API configuration.
-- What happens when the API rate-limits the parser? The parser implements retry with back-off, similar to the catalogue scraper.
+- What happens when the API rate-limits the parser? The parser implements retry with back-off, similar to the catalogue scraper. At Tier 3, 30-second pacing between calls prevents rate limits entirely.
+- What happens when a description references many plugins (20+) and the LLM response exceeds max_tokens? Truncated JSON is recovered by parsing complete dependency objects from the partial array; whatever complete objects exist before the cut-off are kept.
+- What happens when the LLM returns prose or explanatory text instead of JSON (e.g., "I couldn't find exact matches for...")? The prompt explicitly forbids this — responses should be empty arrays on uncertainty. Any non-JSON responses are saved to a failed-responses file for later inspection.
+- What happens when an analyzed creation has no detectable dependencies? Its result is still cached (with empty `dependencies: []`) so it won't be re-processed on subsequent runs — preventing wasted API calls.
+- What happens on crash mid-run? Results are saved after every API call, so at most one response is lost. Resume skips all previously-analyzed creations.
 
 ## Requirements *(mandatory)*
 
@@ -78,11 +87,17 @@ Each detected rule is assigned a confidence level (high, medium, low) by the LLM
 - **FR-005**: Parser MUST collect all LLM-extracted rules and generate a rule book JSON file in the format defined by feature 007, with `load_after` and optionally `load_before` rules.
 - **FR-006**: Each generated rule MUST include a confidence level (high, medium, low) and a note quoting the source text that triggered it.
 - **FR-007**: Parser MUST be a standalone entrypoint, separate from the GUI application.
-- **FR-008**: Parser MUST handle API errors gracefully — retry on transient failures, skip on persistent errors, continue processing remaining creations.
+- **FR-008**: Parser MUST handle API errors gracefully — retry on transient failures with exponential back-off, skip on persistent errors, continue processing remaining creations.
 - **FR-009**: Parser MUST produce a human-readable report file alongside the rule book, summarizing detections, confidence levels, and match rationale.
-- **FR-010**: Parser MUST display progress during processing (similar to the catalogue scraper's in-place counter).
+- **FR-010**: Parser MUST display an in-place progress counter during processing, showing current position relative to the number of creations remaining (not the full catalogue count when resuming).
 - **FR-011**: Parser MUST support a `--dry-run` flag that identifies candidate creations and reports the count without making API calls.
 - **FR-012**: Parser MUST accept an optional `--max-entries` flag to cap the number of creations processed (for cost control during testing).
+- **FR-013**: Parser MUST support multi-pass operation: save ALL analyzed creations to a results cache file (`patch_order_results.json`), including those with empty dependency lists. On subsequent runs, cached content_ids form a skip set to avoid re-processing.
+- **FR-014**: Parser MUST save progress after every successful LLM response (rule book, report, and results cache all updated), so an interrupted run loses at most one API call's worth of work.
+- **FR-015**: Parser MUST save failed (unparseable) LLM responses to a separate file (`patch_order_failed.json`) for later inspection or recovery, containing the creation title, plugin, and raw response text.
+- **FR-016**: Parser MUST attempt to recover complete dependency objects from truncated LLM responses (when the model exceeds max_tokens mid-response). Partial array parsing should extract whatever valid objects exist before the cut-off.
+- **FR-017**: Parser MUST use a sufficiently large `max_tokens` value (4096) to accommodate patches with many listed dependencies (up to ~20 per response).
+- **FR-018**: Parser MUST implement rate-limit-aware pacing between API calls (configurable per tier, default 30 seconds for Tier 3).
 
 ### Key Entities
 
@@ -98,7 +113,9 @@ Each detected rule is assigned a confidence level (high, medium, low) by the LLM
 - **SC-001**: The parser correctly identifies load order dependencies in at least 50% of the ~618 "patch" creations that contain ordering hints in their descriptions.
 - **SC-002**: High-confidence rules have a false positive rate below 5% when manually reviewed against a sample of 20 creations.
 - **SC-003**: The generated rule book is loadable by the rule book engine and produces correct sorting results for known test cases (e.g., Luxurious Ship Habs PDY patch).
-- **SC-004**: Total API cost for processing all candidate creations stays under $10 per full run.
+- **SC-004**: Total API cost for processing all ~1,136 candidate creations stays under $170 per full run at Sonnet pricing. Subsequent runs skip already-analyzed creations and cost significantly less.
+- **SC-006**: Malformed JSON response rate is under 5% of API calls. Recoverable truncation reduces effective failure rate further via partial parsing.
+- **SC-007**: After the initial full run, incremental re-runs (after catalogue updates) only process newly added creations, not the full catalogue.
 - **SC-005**: The report provides enough context for a user to validate each rule without opening the original description.
 
 ## Assumptions
