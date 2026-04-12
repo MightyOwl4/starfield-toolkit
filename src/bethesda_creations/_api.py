@@ -119,6 +119,22 @@ def parse_response(data: dict) -> CreationInfo:
     info.achievement_friendly = resp.get("achievement_friendly", False)
     info.categories = resp.get("categories", [])
 
+    # Platforms with published binaries — uppercase platform identifiers
+    # like WINDOWS, XBOXONE, XBOXSERIESX, PLAYSTATION4, PLAYSTATION5.
+    # PS4/PS5 presence implies the creation was republished on/after the
+    # Free Lanes update (2026-04-07), since PS support launched with it.
+    platforms: list[str] = []
+    for dl in resp.get("download", []):
+        if not isinstance(dl, dict):
+            continue
+        plat = dl.get("hardware_platform")
+        if not plat:
+            continue
+        # Only count platforms that actually have a published version.
+        if dl.get("published"):
+            platforms.append(plat)
+    info.platforms = platforms
+
     # Version and size from download (published binaries) — WINDOWS only.
     # The download field is the authoritative per-platform source.
     # release_notes are shared across platforms and can be misleading.

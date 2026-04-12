@@ -339,7 +339,8 @@ def test_full_check_flow_classifies_correctly():
             row["status"] = STATUS_UNKNOWN
             continue
         baseline_version = baseline["v"]
-        # File-mode: current version = installed version from row
+        # Direct _classify exercise — reuse the row's installed_version as
+        # the `current` input to cover a matrix of version relationships.
         current = row["installed_version"]
         row["status"] = _classify(current, baseline_version)
 
@@ -404,7 +405,9 @@ def test_skin_override_applies_even_when_updated():
 
 def test_snapshot_round_trip_through_fast_lane_check(tmp_path):
     """Save a snapshot via the load order tool, load it via fast lane, and
-    verify versions flow into the comparison rows."""
+    verify classification uses API-current vs baseline (not snapshot's
+    installed_version)."""
+    from bethesda_creations.models import CreationInfo
     from load_order_sorter import save_snapshot
     from load_order_sorter.models import SnapshotEntry
 
@@ -414,10 +417,12 @@ def test_snapshot_round_trip_through_fast_lane_check(tmp_path):
         SnapshotEntry("id-2", "Fresh Mod", ["b.esm"], installed_version="2.0"),
     ], snap_path, "1.0")
 
-    # Build a tool with a baseline that knows about both
+    # Both baselines are "1.0". API reports id-1 still at 1.0 (stale) and
+    # id-2 updated to 2.0 (updated). Classification uses API, not the
+    # snapshot's installed_version.
     baseline = {
-        "id-1": {"t": "Stale Mod", "a": "Dev", "v": "1.0"},  # not_updated
-        "id-2": {"t": "Fresh Mod", "a": "Dev", "v": "1.0"},  # updated
+        "id-1": {"t": "Stale Mod", "a": "Dev", "v": "1.0"},
+        "id-2": {"t": "Fresh Mod", "a": "Dev", "v": "1.0"},
     }
     tool = _make_tool_with_baseline(baseline)
 
@@ -437,14 +442,78 @@ def test_snapshot_round_trip_through_fast_lane_check(tmp_path):
         }
         for i, e in enumerate(snapshot.entries)
     ]
-    tool._run_comparison({})
 
-    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED  # 1.0 == 1.0
-    assert tool._rows[1]["status"] == STATUS_UPDATED      # 2.0 > 1.0
+    # Simulate the API responses: id-1 still at 1.0, id-2 at 2.0.
+    info_map = {
+        "id-1": CreationInfo(version="1.0"),
+        "id-2": CreationInfo(version="2.0"),
+    }
+    tool._run_comparison(info_map)
+
+    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED  # api 1.0 == baseline 1.0
+    assert tool._rows[1]["status"] == STATUS_UPDATED      # api 2.0 > baseline 1.0
+
+
+def test_ps_support_promotes_not_updated_to_likely_updated():
+    """Version matches baseline BUT creation lists PS4/PS5 support →
+    reclassify as likely_updated (author republished post-Free-Lanes
+    without bumping the version)."""
+    from bethesda_creations.models import CreationInfo
+    from starfield_tool.tools.fast_lane_check import STATUS_LIKELY_UPDATED
+    baseline = {
+        "ps-id": {"t": "PS Mod", "a": "Dev", "v": "1.0"},
+    }
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [{
+        "content_id": "ps-id",
+        "title": "PS Mod",
+        "author": "Dev",
+        "installed_version": "1.0",
+        "load_position": 1,
+        "baseline_version": None,
+        "current_version": None,
+        "status": None,
+    }]
+    info_map = {
+        "ps-id": CreationInfo(
+            version="1.0",  # same as baseline
+            platforms=["WINDOWS", "XBOXSERIESX", "PLAYSTATION5"],
+        ),
+    }
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LIKELY_UPDATED
+
+
+def test_no_ps_support_stays_not_updated():
+    """Version matches baseline, no PS platform → still flagged not_updated."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {
+        "pc-only": {"t": "PC Only Mod", "a": "Dev", "v": "1.0"},
+    }
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [{
+        "content_id": "pc-only",
+        "title": "PC Only Mod",
+        "author": "Dev",
+        "installed_version": "1.0",
+        "load_position": 1,
+        "baseline_version": None,
+        "current_version": None,
+        "status": None,
+    }]
+    info_map = {
+        "pc-only": CreationInfo(
+            version="1.0",
+            platforms=["WINDOWS", "XBOXSERIESX"],
+        ),
+    }
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED
 
 
 def test_non_skin_unaffected_by_skin_override():
-    """Entries without the s flag classify normally."""
+    """Entries without the s flag classify normally via API current vs baseline."""
+    from bethesda_creations.models import CreationInfo
     baseline = {
         "quest-id": {"t": "Quest Mod", "a": "Dev", "v": "1.0"},
     }
@@ -459,5 +528,6 @@ def test_non_skin_unaffected_by_skin_override():
         "current_version": None,
         "status": None,
     }]
-    tool._run_comparison({})
+    # API reports current == baseline → not updated
+    tool._run_comparison({"quest-id": CreationInfo(version="1.0")})
     assert tool._rows[0]["status"] == STATUS_NOT_UPDATED

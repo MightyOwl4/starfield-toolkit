@@ -6,22 +6,27 @@
 
 ### RuleBook (file on disk)
 
-A JSON file containing ordering rules between creations.
+A JSON file containing ordering or tiering rules between creations.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Display name for the rule book |
 | description | string | Brief explanation of what the book fixes/addresses |
+| type | string | `"order"` (default) or `"tier"` — determines what kind of constraints the book produces |
 | version | string | Optional version string for tracking changes |
-| rules | list[Rule] | Ordered list of ordering constraints |
+| rules | list[Rule] | Ordered list of constraints (schema depends on `type`) |
+
+**Book types**:
+- `"order"` (default): Rules define `load_after`/`load_before` ordering between creations. This is the original behavior.
+- `"tier"`: Rules override the category-based tier assignment for specific creations. Useful when Bethesda's API categories don't reflect a mod's actual role in the load order.
 
 **File locations**:
 - User books: `%APPDATA%/StarfieldToolkit/rules/*.json`
 - Curated books: bundled `data/rules/*.json` (e.g., `001_base_fixes.json`)
 
-### Rule
+### Rule (order book)
 
-A single ordering constraint within a rule book.
+A single ordering constraint within an order-type rule book.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -33,6 +38,18 @@ A single ordering constraint within a rule book.
 **Normalization**: At load time, `load_before` entries are converted to equivalent `load_after` constraints. If plugin A has `load_before: ["B"]`, the system produces a `load_after: ["A"]` constraint on plugin B. This means the sorting pipeline only ever sees `load_after` constraints.
 
 **Note**: Both `load_after` and `load_before` may reference plugins that are NOT entries in the rule book. This allows rules like "put this patch between ModA and ModB" where only the patch is a book entry. Missing (uninstalled) referenced plugins are skipped as per FR-004.
+
+### Rule (tier book)
+
+A single tier override within a tier-type rule book.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| plugin | string | Plugin filename of the creation being re-tiered |
+| tier | integer (1-11) | The tier to assign, overriding the category-based default |
+| note | string (optional) | Human-readable explanation for why this tier is correct |
+
+**Priority**: Tier constraints from rule books (priority 30 curated, 40+ user) beat category-based tiers (priority 10) but lose to LOOT group assignments (priority 20 — though in practice LOOT rarely assigns tiers to creations). A per-book type restriction prevents mixing tier and ordering rules in the same file.
 
 ### RuleBookRegistryEntry (in config)
 
@@ -120,4 +137,24 @@ In-memory representation combining file content with registry state and applicab
 
 The `load_before` example is normalized at load time to:
 - `compat_patch.esm` load_after `base_mod.esm` (explicit)
+- `overhaul_mod.esm` load_after `compat_patch.esm` (from load_before conversion)
+
+### Tier override book
+```json
+{
+  "name": "Ship Builder Tier Corrections",
+  "description": "Override category-based tiers for mods whose Bethesda categories don't reflect their actual role.",
+  "type": "tier",
+  "version": "1.0",
+  "rules": [
+    {
+      "plugin": "PlaceDoorsYourself.esm",
+      "tier": 3,
+      "note": "PDY rewrites all HAB records — foundational overhaul, not a gameplay tweak"
+    }
+  ]
+}
+```
+
+Tier books use `"type": "tier"` in the header. Each rule specifies a `tier` (1-11) instead of `load_after`/`load_before`. The two rule types cannot be mixed in the same file.
 - `overhaul_mod.esm` load_after `compat_patch.esm` (from load_before conversion)

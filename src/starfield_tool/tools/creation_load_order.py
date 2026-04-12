@@ -147,14 +147,17 @@ class CreationLoadOrderTool(ToolModule):
         # Style treeview to match dark/light theme
         style = ttk.Style()
         style.theme_use("default")
+        from starfield_tool.grid_style import (
+            grid_font, grid_heading_font, grid_rowheight,
+        )
         style.configure(
             "Treeview",
             background=bg,
             foreground=fg,
             fieldbackground=bg,
-            rowheight=28,
+            rowheight=grid_rowheight(extra=4),
             borderwidth=0,
-            font=("Segoe UI", 10),
+            font=grid_font(),
         )
         style.configure(
             "Treeview.Heading",
@@ -162,7 +165,7 @@ class CreationLoadOrderTool(ToolModule):
             foreground=heading_fg,
             borderwidth=1,
             relief="flat",
-            font=("Segoe UI", 9, "bold"),
+            font=grid_heading_font(),
         )
         style.map(
             "Treeview",
@@ -542,7 +545,10 @@ class CreationLoadOrderTool(ToolModule):
                     info.thumbnail_url, content_id=creation.content_id,
                 )
         from starfield_tool.dialogs.creation_details import CreationDetailsDialog
-        CreationDetailsDialog(self._tree, creation.display_name, info, thumb)
+        CreationDetailsDialog(
+            self._tree, creation.display_name, info, thumb,
+            content_id=creation.content_id,
+        )
 
     def _get_selected_creation(self) -> Creation | None:
         """Return the creation currently selected in the active grid mode."""
@@ -766,6 +772,7 @@ class CreationLoadOrderTool(ToolModule):
         from starfield_tool.dialogs.creation_details import CreationDetailsDialog
         CreationDetailsDialog(
             self._media_frame, creation.display_name, info, thumb,
+            content_id=creation.content_id,
         )
 
     def _download_thumbnails(self):

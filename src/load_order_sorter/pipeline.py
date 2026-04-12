@@ -119,6 +119,9 @@ def _merge_constraints(
             all_warnings.extend(c.warnings)
         decision.warnings = all_warnings
 
+        # Preserve every constraint (winners AND losers) for UI explanation
+        decision.all_constraints = list(plugin_constraints)
+
         decisions[plugin_name] = decision
 
     return decisions

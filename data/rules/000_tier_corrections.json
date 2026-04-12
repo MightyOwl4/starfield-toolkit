@@ -1,0 +1,17 @@
+ {
+  "name": "Tier Corrections",
+  "description": "Override Bethesda API category-based tier assignments where they conflict with a mod's actual role in the load order.",
+  "type": "tier",
+  "version": "1.0",
+  "maintainer": {
+    "name": "Starfield Toolkit",
+    "url": "https://github.com/MightyOwl4/starfield-toolkit"
+  },
+  "rules": [
+    {
+      "plugin": "PlaceDoorsYourself.esm",
+      "tier": 3,
+      "note": "PDY rewrites all HAB records to disable automatic door placement. Other ship mods patch against it, making it a foundational ship builder overhaul (tier 3) rather than a simple gameplay tweak (tier 5)."
+    }
+  ]
+}
