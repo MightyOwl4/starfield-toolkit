@@ -31,7 +31,9 @@ _NOT_UPDATED_BG = "#d4a71a"  # yellow highlight
 _LIKELY_UPDATED_BG = "#5f7f3a"  # muted green — cautiously optimistic
 _LIKELY_UPDATED_FG = "#ffffff"
 _UNKNOWN_FG = "#888888"
-_SKIN_FG = "#888888"  # muted grey — non-obtrusive marker
+_UNAFFECTED_FG = "#888888"  # muted grey — non-obtrusive marker
+_LOW_RISK_BG = "#a37015"  # muted amber, softer than _NOT_UPDATED_BG
+_LOW_RISK_FG = "#ffffff"
 
 # Status constants
 STATUS_UPDATED = "updated"
@@ -40,12 +42,34 @@ STATUS_LIKELY_UPDATED = "likely_updated"  # version matches baseline BUT PS
 #                                           support present → almost certainly
 #                                           republished post-Free-Lanes without
 #                                           a version bump.
+STATUS_LOW_RISK = "low_risk"  # version matches baseline, no PS support, but
+#                                categories indicate additive content unlikely
+#                                to be affected — user decides.
 STATUS_UNKNOWN = "unknown"
-STATUS_SKIN = "skin"  # excluded from outdated check (skins rarely affected)
+STATUS_UNAFFECTED = "unaffected"  # excluded from outdated check via SAFE
+#                                   category match or baseline s=1 flag.
 
 # Platform identifiers that prove post-Free-Lanes republish.
 # (Free Lanes + PS5 launch: 2026-04-07)
 _POST_FREE_LANES_PLATFORMS = frozenset({"PLAYSTATION4", "PLAYSTATION5"})
+
+# Categories presumed entirely unaffected by Free Lanes — the update changed
+# space travel / cruise mode / new content, not any of these systems.
+_SAFE_CATEGORIES = frozenset({
+    "Skins", "Apparel", "Body", "Photo Mode", "Audio",
+})
+
+# Categories whose mods are low-risk: additive items / parts that don't
+# intersect with the systems Free Lanes changed.  Verify manually if needed.
+_LOW_RISK_CATEGORIES = frozenset({
+    "Weapons", "Gear", "Ships",
+})
+
+# Meta-tags: auxiliary descriptors, not gameplay classifications.  Stripped
+# before SAFE / LOW_RISK membership evaluation.
+_META_CATEGORIES = frozenset({
+    "Load Order Neutral", "Lore Friendly", "Work in Progress",
+})
 
 # Input mode constants
 MODE_INSTALLED = "installed"
@@ -136,17 +160,43 @@ def _classify(current: str | None, baseline: str | None) -> str:
     return STATUS_UNKNOWN
 
 
+def _non_meta(cats: list[str]) -> list[str]:
+    """Strip meta-tag descriptors from a category list."""
+    return [c for c in cats if c not in _META_CATEGORIES]
+
+
+def _pick_safe_reason(cats: list[str], baseline_entry: dict) -> str:
+    """First matching SAFE category from the list, or 'Skin' if the
+    baseline flag triggered."""
+    for c in cats:
+        if c in _SAFE_CATEGORIES:
+            return c
+    return "Skin" if baseline_entry.get("s") == 1 else ""
+
+
+def _pick_low_risk_reason(cats: list[str]) -> str:
+    """First matching LOW_RISK category from the list."""
+    for c in cats:
+        if c in _LOW_RISK_CATEGORIES:
+            return c
+    return ""
+
+
 def _status_sort_key(row: dict) -> int:
+    """Sort order (lower = more urgent): not_updated first, unknown,
+    low_risk, likely_updated, unaffected, updated."""
     status = row.get("status")
     if status == STATUS_NOT_UPDATED:
         return 0
     if status == STATUS_UNKNOWN:
         return 1
-    if status == STATUS_LIKELY_UPDATED:
+    if status == STATUS_LOW_RISK:
         return 2
-    if status == STATUS_SKIN:
+    if status == STATUS_LIKELY_UPDATED:
         return 3
-    return 4  # updated
+    if status == STATUS_UNAFFECTED:
+        return 4
+    return 5  # updated
 
 
 # --- Export File Parsers ---
@@ -298,9 +348,12 @@ class FastLaneCheckTool(ToolModule):
             f"whose version matches the baseline BUT that now lists PlayStation "
             f"support is reclassified as \"likely updated\" — PS support was only "
             f"possible after the Free Lanes update (2026-04-07), so the author "
-            f"republished even though they didn't bump the version. Skins are "
-            f"excluded from the check as they are unlikely to be affected. Always "
-            f"verify manually before making decisions."
+            f"republished even though they didn't bump the version. "
+            f"Skins, Apparel, Body, Photo Mode, and Audio creations are shown "
+            f"as \"unaffected\" — the Free Lanes update did not touch those "
+            f"systems. Weapons, Gear, and Ships are flagged as \"low risk\" "
+            f"when their version matches the baseline — typically safe, but "
+            f"worth confirming. Always verify manually before making decisions."
         )
 
         banner = ctk.CTkFrame(parent, fg_color=_WARNING_BG, corner_radius=4)
@@ -454,8 +507,11 @@ class FastLaneCheckTool(ToolModule):
             "likely_updated",
             background=_LIKELY_UPDATED_BG, foreground=_LIKELY_UPDATED_FG,
         )
+        self._tree.tag_configure(
+            "low_risk", background=_LOW_RISK_BG, foreground=_LOW_RISK_FG,
+        )
         self._tree.tag_configure("unknown", foreground=_UNKNOWN_FG)
-        self._tree.tag_configure("skin", foreground=_SKIN_FG)
+        self._tree.tag_configure("unaffected", foreground=_UNAFFECTED_FG)
 
         return frame
 
@@ -484,6 +540,13 @@ class FastLaneCheckTool(ToolModule):
             if status == STATUS_NOT_UPDATED:
                 tags = ("not_updated",)
                 status_text = "Not updated"
+            elif status == STATUS_LOW_RISK:
+                tags = ("low_risk",)
+                reason = row.get("low_risk_reason", "")
+                status_text = (
+                    f"Not updated ({reason} — low risk)"
+                    if reason else "Not updated (low risk)"
+                )
             elif status == STATUS_LIKELY_UPDATED:
                 tags = ("likely_updated",)
                 status_text = "Likely updated (PS)"
@@ -493,9 +556,12 @@ class FastLaneCheckTool(ToolModule):
             elif status == STATUS_UNKNOWN:
                 tags = ("unknown",)
                 status_text = "Unknown"
-            elif status == STATUS_SKIN:
-                tags = ("skin",)
-                status_text = "\u26A0 Skin"
+            elif status == STATUS_UNAFFECTED:
+                tags = ("unaffected",)
+                reason = row.get("unaffected_reason", "")
+                status_text = (
+                    f"\u26A0 {reason}" if reason else "\u26A0 Unaffected"
+                )
             else:
                 tags = ()
                 status_text = "(not checked)"
@@ -538,15 +604,19 @@ class FastLaneCheckTool(ToolModule):
                 text=f"{total} creation(s) loaded — click Check to compare"
             )
             return
-        not_updated = sum(1 for r in self._rows if r.get("status") == STATUS_NOT_UPDATED)
-        likely = sum(1 for r in self._rows if r.get("status") == STATUS_LIKELY_UPDATED)
-        updated = sum(1 for r in self._rows if r.get("status") == STATUS_UPDATED)
-        unknown = sum(1 for r in self._rows if r.get("status") == STATUS_UNKNOWN)
-        skins = sum(1 for r in self._rows if r.get("status") == STATUS_SKIN)
+        def _count(s):
+            return sum(1 for r in self._rows if r.get("status") == s)
+        not_updated = _count(STATUS_NOT_UPDATED)
+        low_risk = _count(STATUS_LOW_RISK)
+        likely = _count(STATUS_LIKELY_UPDATED)
+        updated = _count(STATUS_UPDATED)
+        unknown = _count(STATUS_UNKNOWN)
+        unaffected = _count(STATUS_UNAFFECTED)
         self._summary_label.configure(
-            text=f"{total} total | {not_updated} not updated | "
-                 f"{likely} likely updated | {updated} updated | "
-                 f"{unknown} unknown | {skins} skins"
+            text=(f"{total} total | {not_updated} not updated | "
+                  f"{low_risk} low risk | {likely} likely updated | "
+                  f"{updated} updated | {unknown} unknown | "
+                  f"{unaffected} unaffected")
         )
 
     # ----- Row interaction: open details dialog -----
@@ -844,20 +914,44 @@ class FastLaneCheckTool(ToolModule):
             row["platforms"] = platforms
             has_ps = any(p in _POST_FREE_LANES_PLATFORMS for p in platforms)
             row["has_ps_support"] = has_ps
-            # Skins are excluded from the outdated check — they almost never
-            # break across game updates. We still surface them with a low-key
-            # marker so the user knows the row was recognised.
-            if baseline_entry.get("s") == 1:
-                row["status"] = STATUS_SKIN
-            else:
-                status = _classify(current_version, baseline_version)
-                # PS support implies post-Free-Lanes republish.  If the
-                # version still matches the baseline, the author republished
-                # (for PS) without bumping the version — a stale-version
-                # alert here would be a false positive.
-                if status == STATUS_NOT_UPDATED and has_ps:
-                    status = STATUS_LIKELY_UPDATED
-                row["status"] = status
+
+            categories = info.categories if info else []
+            non_meta = _non_meta(categories)
+
+            # SAFE: categories are purely cosmetic, or baseline has s=1 flag
+            # → skip the version check entirely and render as Unaffected.
+            is_safe = baseline_entry.get("s") == 1 or (
+                bool(non_meta)
+                and all(c in _SAFE_CATEGORIES for c in non_meta)
+            )
+            if is_safe:
+                row["status"] = STATUS_UNAFFECTED
+                row["unaffected_reason"] = _pick_safe_reason(
+                    categories, baseline_entry,
+                )
+                continue
+
+            status = _classify(current_version, baseline_version)
+            # PS support implies post-Free-Lanes republish.  If the
+            # version still matches the baseline, the author republished
+            # (for PS) without bumping the version — a stale-version
+            # alert here would be a false positive.
+            if status == STATUS_NOT_UPDATED and has_ps:
+                status = STATUS_LIKELY_UPDATED
+
+            # LOW_RISK: categories are additive content (weapons / gear /
+            # ships) with all non-meta in (SAFE ∪ LOW_RISK).  Soften the
+            # not-updated warning but still surface it for user review.
+            if status == STATUS_NOT_UPDATED and non_meta:
+                allowed = _SAFE_CATEGORIES | _LOW_RISK_CATEGORIES
+                if (
+                    all(c in allowed for c in non_meta)
+                    and any(c in _LOW_RISK_CATEGORIES for c in non_meta)
+                ):
+                    status = STATUS_LOW_RISK
+                    row["low_risk_reason"] = _pick_low_risk_reason(categories)
+
+            row["status"] = status
 
         # Preserve load order — do NOT sort. Rows stay in the order they were
         # loaded (installed: game's load order; file: export's row order).

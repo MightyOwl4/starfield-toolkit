@@ -2,8 +2,10 @@
 import json
 
 from starfield_tool.tools.fast_lane_check import (
+    STATUS_LIKELY_UPDATED,
+    STATUS_LOW_RISK,
     STATUS_NOT_UPDATED,
-    STATUS_SKIN,
+    STATUS_UNAFFECTED,
     STATUS_UNKNOWN,
     STATUS_UPDATED,
     _classify,
@@ -161,14 +163,14 @@ def test_sort_key_not_updated_first():
         {"status": STATUS_UPDATED},
         {"status": STATUS_NOT_UPDATED},
         {"status": STATUS_UNKNOWN},
-        {"status": STATUS_SKIN},
+        {"status": STATUS_UNAFFECTED},
         {"status": STATUS_NOT_UPDATED},
     ]
     rows.sort(key=_status_sort_key)
     assert rows[0]["status"] == STATUS_NOT_UPDATED
     assert rows[1]["status"] == STATUS_NOT_UPDATED
     assert rows[2]["status"] == STATUS_UNKNOWN
-    assert rows[3]["status"] == STATUS_SKIN
+    assert rows[3]["status"] == STATUS_UNAFFECTED
     assert rows[4]["status"] == STATUS_UPDATED
 
 
@@ -364,7 +366,7 @@ def _make_tool_with_baseline(baseline_entries: dict):
 
 
 def test_skin_overrides_not_updated():
-    """A version-stale skin should be marked STATUS_SKIN, not STATUS_NOT_UPDATED."""
+    """A version-stale skin should be marked STATUS_UNAFFECTED, not STATUS_NOT_UPDATED."""
     baseline = {
         "skin-id": {"t": "Pirate Skin", "a": "kine", "v": "1.0", "s": 1},
     }
@@ -380,7 +382,7 @@ def test_skin_overrides_not_updated():
         "status": None,
     }]
     tool._run_comparison({})
-    assert tool._rows[0]["status"] == STATUS_SKIN
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
 
 
 def test_skin_override_applies_even_when_updated():
@@ -400,7 +402,7 @@ def test_skin_override_applies_even_when_updated():
         "status": None,
     }]
     tool._run_comparison({})
-    assert tool._rows[0]["status"] == STATUS_SKIN
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
 
 
 def test_snapshot_round_trip_through_fast_lane_check(tmp_path):
@@ -531,3 +533,213 @@ def test_non_skin_unaffected_by_skin_override():
     # API reports current == baseline → not updated
     tool._run_comparison({"quest-id": CreationInfo(version="1.0")})
     assert tool._rows[0]["status"] == STATUS_NOT_UPDATED
+
+
+# ---------------------------------------------------------------------------
+# 011: SAFE category (Unaffected) classification
+# ---------------------------------------------------------------------------
+
+
+def _make_row(content_id="id-1", title="Mod", version="1.0"):
+    return {
+        "content_id": content_id,
+        "title": title,
+        "author": "Dev",
+        "installed_version": version,
+        "load_position": 1,
+        "baseline_version": None,
+        "current_version": None,
+        "status": None,
+    }
+
+
+def test_apparel_marked_unaffected():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Outfit", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Outfit")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Apparel"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
+    assert tool._rows[0]["unaffected_reason"] == "Apparel"
+
+
+def test_photo_mode_marked_unaffected():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Filter", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Filter")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Photo Mode"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
+
+
+def test_audio_marked_unaffected():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Music", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Music")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Audio"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
+
+
+def test_meta_tags_ignored_for_safe():
+    """[Apparel, Lore Friendly] — Lore Friendly is meta, so non_meta=['Apparel']
+    and the SAFE check passes."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Lore Outfit", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Lore Outfit")]
+    info_map = {"id-1": CreationInfo(
+        version="1.0", categories=["Apparel", "Lore Friendly"],
+    )}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
+
+
+def test_mixed_apparel_quests_stays_not_updated():
+    """[Apparel, Quests] — Quests is neither safe nor low-risk, so strict
+    combination fails and the creation stays in the full warning bucket."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Quest Outfit", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Quest Outfit")]
+    info_map = {"id-1": CreationInfo(
+        version="1.0", categories=["Apparel", "Quests"],
+    )}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED
+
+
+def test_baseline_skin_flag_fallback():
+    """baseline.s == 1, no API categories → still Unaffected via fallback."""
+    baseline = {"id-1": {"t": "Skin", "a": "Dev", "v": "1.0", "s": 1}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Skin")]
+    tool._run_comparison({})  # no API info — must still classify as Unaffected
+    assert tool._rows[0]["status"] == STATUS_UNAFFECTED
+    assert tool._rows[0]["unaffected_reason"] == "Skin"
+
+
+# ---------------------------------------------------------------------------
+# 011: LOW_RISK category annotation
+# ---------------------------------------------------------------------------
+
+
+def test_weapons_marked_low_risk():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Gun", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Gun")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Weapons"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LOW_RISK
+    assert tool._rows[0]["low_risk_reason"] == "Weapons"
+
+
+def test_gear_marked_low_risk():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Helmet", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Helmet")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Gear"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LOW_RISK
+
+
+def test_ships_marked_low_risk():
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Hab", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Hab")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Ships"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LOW_RISK
+    assert tool._rows[0]["low_risk_reason"] == "Ships"
+
+
+def test_ps_support_wins_over_low_risk():
+    """Weapons category + PS5 platform → Likely updated (PS precedence)."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "PS Gun", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "PS Gun")]
+    info_map = {"id-1": CreationInfo(
+        version="1.0",
+        categories=["Weapons"],
+        platforms=["WINDOWS", "PLAYSTATION5"],
+    )}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LIKELY_UPDATED
+
+
+def test_quest_mod_stays_not_updated():
+    """Quests is neither safe nor low-risk — no tier relief."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Quest", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Quest")]
+    info_map = {"id-1": CreationInfo(version="1.0", categories=["Quests"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED
+
+
+def test_mixed_weapons_quests_stays_not_updated():
+    """[Weapons, Quests] — strict combination rejects the mix."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "QGun", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "QGun")]
+    info_map = {"id-1": CreationInfo(
+        version="1.0", categories=["Weapons", "Quests"],
+    )}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_NOT_UPDATED
+
+
+def test_weapons_with_updated_version_stays_updated():
+    """Category tier must never downgrade a genuine version update."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Gun", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Gun")]
+    info_map = {"id-1": CreationInfo(version="2.0", categories=["Weapons"])}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_UPDATED
+
+
+def test_mixed_safe_and_low_risk_triggers_low_risk():
+    """[Apparel, Weapons] — all in (SAFE ∪ LOW_RISK), at least one in LOW_RISK
+    → Low risk."""
+    from bethesda_creations.models import CreationInfo
+    baseline = {"id-1": {"t": "Mixed", "a": "Dev", "v": "1.0"}}
+    tool = _make_tool_with_baseline(baseline)
+    tool._rows = [_make_row("id-1", "Mixed")]
+    info_map = {"id-1": CreationInfo(
+        version="1.0", categories=["Apparel", "Weapons"],
+    )}
+    tool._run_comparison(info_map)
+    assert tool._rows[0]["status"] == STATUS_LOW_RISK
+
+
+# ---------------------------------------------------------------------------
+# 011: Summary line and sort key
+# ---------------------------------------------------------------------------
+
+
+def test_sort_key_ordering_matches_spec():
+    assert _status_sort_key({"status": STATUS_NOT_UPDATED}) == 0
+    assert _status_sort_key({"status": STATUS_UNKNOWN}) == 1
+    assert _status_sort_key({"status": STATUS_LOW_RISK}) == 2
+    assert _status_sort_key({"status": STATUS_LIKELY_UPDATED}) == 3
+    assert _status_sort_key({"status": STATUS_UNAFFECTED}) == 4
+    assert _status_sort_key({"status": STATUS_UPDATED}) == 5
+    # Ordering: each subsequent tier must have a key >= the previous.
+    keys = [
+        _status_sort_key({"status": s}) for s in (
+            STATUS_NOT_UPDATED, STATUS_UNKNOWN, STATUS_LOW_RISK,
+            STATUS_LIKELY_UPDATED, STATUS_UNAFFECTED, STATUS_UPDATED,
+        )
+    ]
+    assert keys == sorted(keys)
