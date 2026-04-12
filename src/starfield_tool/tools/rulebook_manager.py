@@ -21,6 +21,8 @@ class RuleBookTool(ToolModule):
         self._book_data: dict[str, dict] = {}  # filename → loaded book data
         self._detail_text: ctk.CTkTextbox | None = None
         self._status_label: ctk.CTkLabel | None = None
+        self._installed: set[str] = set()
+        self._hide_na_rules = True  # hide non-applicable rules in details
 
     def initialize(self, context: ModuleContext) -> None:
         self._context = context
@@ -62,14 +64,31 @@ class RuleBookTool(ToolModule):
             top, text="Toggle", width=70, command=self._toggle_enabled, **_btn_kw,
         ).pack(side="left", padx=(0, 6))
 
+        # "Hide non-applicable rules" toggle — right-aligned
+        _toggle_frame = ctk.CTkFrame(top, fg_color="transparent")
+        _toggle_frame.pack(side="right", padx=(0, 4))
+        ctk.CTkLabel(
+            _toggle_frame, text="Hide non-applicable rules",
+            font=ctk.CTkFont(size=11),
+        ).pack(side="left", padx=(0, 6))
+        self._hide_na_switch = ctk.CTkSwitch(
+            _toggle_frame, text="", width=40,
+            command=self._toggle_hide_na_rules,
+        )
+        self._hide_na_switch.pack(side="left")
+        if self._hide_na_rules:
+            self._hide_na_switch.select()
+
         self._status_label = ctk.CTkLabel(top, text="")
         self._status_label.pack(side="right", padx=(8, 0))
 
         # Main area: tree (left) + details (right)
         main = ctk.CTkFrame(frame, fg_color="transparent")
         main.pack(fill="both", expand=True, padx=8, pady=(0, 4))
-        main.columnconfigure(0, weight=3)
-        main.columnconfigure(1, weight=2)
+        # minsize prevents either pane from being squeezed to zero when the
+        # user drags the window smaller — weights alone aren't enough.
+        main.columnconfigure(0, weight=2, minsize=300)
+        main.columnconfigure(1, weight=3, minsize=280)
         main.rowconfigure(0, weight=1)
 
         # Treeview
@@ -79,30 +98,31 @@ class RuleBookTool(ToolModule):
         sel_bg = "#3d5f99" if is_dark else "#cce0ff"
 
         style = ttk.Style()
+        from starfield_tool.grid_style import grid_font, grid_rowheight
         style.configure(
             "RuleBook.Treeview",
             background=tree_bg, foreground=tree_fg, fieldbackground=tree_bg,
-            rowheight=24, font=("Segoe UI", 10),
+            rowheight=grid_rowheight(), font=grid_font(),
         )
         style.map("RuleBook.Treeview", background=[("selected", sel_bg)])
 
         tree_frame = tk.Frame(main, bg=tree_bg)
         tree_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
 
-        columns = ("status", "source", "rules", "applicable")
+        columns = ("status", "maintainer", "rules", "applicable")
         self._tree = ttk.Treeview(
             tree_frame, columns=columns, show="tree headings",
             style="RuleBook.Treeview", selectmode="browse",
         )
         self._tree.heading("#0", text="Name", anchor="w")
         self._tree.heading("status", text="Status", anchor="w")
-        self._tree.heading("source", text="Source", anchor="w")
+        self._tree.heading("maintainer", text="Maintainer", anchor="w")
         self._tree.heading("rules", text="Rules", anchor="center")
         self._tree.heading("applicable", text="Match", anchor="center")
 
-        self._tree.column("#0", width=200, minwidth=120)
+        self._tree.column("#0", width=320, minwidth=180)
         self._tree.column("status", width=80, minwidth=60)
-        self._tree.column("source", width=70, minwidth=50)
+        self._tree.column("maintainer", width=140, minwidth=80)
         self._tree.column("rules", width=50, minwidth=40)
         self._tree.column("applicable", width=50, minwidth=40)
 
@@ -135,6 +155,12 @@ class RuleBookTool(ToolModule):
         )
         self._detail_text.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
+        # Tags for styled text in detail panel
+        self._detail_text._textbox.tag_configure(
+            "bold", font=("Segoe UI", 11, "bold"))
+        self._detail_text._textbox.tag_configure(
+            "grey", foreground="#888888")
+
         # Load data
         self._scan_and_populate()
         self._check_corrupted_on_startup()
@@ -157,7 +183,7 @@ class RuleBookTool(ToolModule):
     def _scan_and_populate(self):
         from load_order_sorter.rulebook import (
             discover_rulebooks, reconcile_registry, load_rulebook,
-            normalize_rules, check_applicability,
+            normalize_rules, check_applicability, check_tier_applicability,
         )
 
         user_dir = self._get_user_rules_dir()
@@ -177,7 +203,8 @@ class RuleBookTool(ToolModule):
         }
 
         # Get installed plugins for applicability
-        installed = set()
+        self._installed = set()
+        installed = self._installed
         if self._context and self._context.game_installation:
             from starfield_tool.parsers import parse_content_catalog
             entries = parse_content_catalog(
@@ -208,6 +235,8 @@ class RuleBookTool(ToolModule):
                 info.update(
                     name=entry["filename"],
                     description="",
+                    maintainer_name="n/a",
+                    maintainer_url="",
                     rules=[],
                     rule_count=0,
                     applicable_count=0,
@@ -216,18 +245,44 @@ class RuleBookTool(ToolModule):
                     is_corrupted=True,
                 )
             else:
-                rules = normalize_rules(book.get("rules", []))
-                applicable, missing, is_ok = check_applicability(rules, installed)
-                info.update(
-                    name=book.get("name", entry["filename"]),
-                    description=book.get("description", ""),
-                    rules=rules,
-                    rule_count=len(rules),
-                    applicable_count=len(applicable),
-                    missing_plugins=missing,
-                    is_applicable=is_ok,
-                    is_corrupted=False,
-                )
+                maintainer = book.get("maintainer", {})
+                info["maintainer_name"] = maintainer.get("name", "n/a") if isinstance(maintainer, dict) else "n/a"
+                info["maintainer_url"] = maintainer.get("url", "") if isinstance(maintainer, dict) else ""
+
+                book_type = book.get("type", "order")
+                raw_rules = book.get("rules", [])
+
+                if book_type == "tier":
+                    applicable, missing, is_ok = check_tier_applicability(
+                        raw_rules, installed,
+                    )
+                    info.update(
+                        name=book.get("name", entry["filename"]),
+                        description=book.get("description", ""),
+                        book_type="tier",
+                        rules=raw_rules,
+                        rule_count=len(raw_rules),
+                        applicable_count=len(applicable),
+                        missing_plugins=missing,
+                        is_applicable=is_ok,
+                        is_corrupted=False,
+                    )
+                else:
+                    rules = normalize_rules(raw_rules)
+                    applicable, missing, is_ok = check_applicability(
+                        rules, installed,
+                    )
+                    info.update(
+                        name=book.get("name", entry["filename"]),
+                        description=book.get("description", ""),
+                        book_type="order",
+                        rules=rules,
+                        rule_count=len(rules),
+                        applicable_count=len(applicable),
+                        missing_plugins=missing,
+                        is_applicable=is_ok,
+                        is_corrupted=False,
+                    )
 
             self._book_data[entry["filename"]] = info
 
@@ -260,7 +315,7 @@ class RuleBookTool(ToolModule):
                 status = "Active"
                 tags = ("curated",) if entry["source"] == "curated" else ()
 
-            source_label = "Curated" if entry["source"] == "curated" else "User"
+            maintainer = info.get("maintainer_name", "n/a")
             rule_count = info.get("rule_count", 0)
             applicable = info.get("applicable_count", 0)
 
@@ -268,7 +323,7 @@ class RuleBookTool(ToolModule):
                 "", "end",
                 iid=entry["filename"],
                 text=info.get("name", entry["filename"]),
-                values=(status, source_label, rule_count, applicable),
+                values=(status, maintainer, rule_count, applicable),
                 tags=tags,
             )
 
@@ -289,44 +344,79 @@ class RuleBookTool(ToolModule):
 
         self._detail_text.configure(state="normal")
         self._detail_text.delete("1.0", "end")
+        tw = self._detail_text._textbox
 
-        lines = []
-        lines.append(f"Name: {info.get('name', '')}")
-        lines.append(f"File: {info.get('filename', '')}")
-        lines.append(f"Source: {info.get('source', '').title()}")
-        lines.append(f"Description: {info.get('description', '')}")
-        lines.append("")
+        def _kv(key: str, value: str, value_tag: str = ""):
+            """Insert a bold key + normal value line."""
+            tw.insert("end", key, "bold")
+            if value_tag:
+                tw.insert("end", f" {value}\n", value_tag)
+            else:
+                tw.insert("end", f" {value}\n")
+
+        _kv("Name:", info.get("name", ""))
+        if info.get("source") == "curated":
+            _kv("Path:", "embedded", "grey")
+        else:
+            _kv("Path:", str(info.get("filepath", "")))
+        _kv("Maintainer:", info.get("maintainer_name", "n/a"))
+        maintainer_url = info.get("maintainer_url", "")
+        if maintainer_url:
+            _kv("URL:", maintainer_url)
+        _kv("Description:", info.get("description", ""))
+        tw.insert("end", "\n")
 
         if info.get("is_corrupted"):
-            lines.append("ERROR: This rule book could not be parsed.")
-            lines.append("Reinstall, undo manual changes, or delete the file.")
-            lines.append(f"Path: {info.get('filepath', '')}")
+            tw.insert("end", "ERROR: This rule book could not be parsed.\n")
+            tw.insert("end", "Reinstall, undo manual changes, or delete the file.\n")
         elif not info.get("is_applicable"):
-            lines.append("ERROR: This rule book is not applicable.")
-            lines.append("None of its rules match installed creations.")
+            tw.insert("end", "No rules match installed creations.\n")
         else:
-            lines.append(f"Rules: {info.get('rule_count', 0)} total, "
-                         f"{info.get('applicable_count', 0)} applicable")
+            _kv("Rules:", f"{info.get('rule_count', 0)} total, "
+                 f"{info.get('applicable_count', 0)} applicable")
 
         missing = info.get("missing_plugins", set())
         if missing:
-            lines.append("")
-            lines.append("WARNING: Missing creations (not installed):")
+            tw.insert("end", "\n")
+            tw.insert("end", "Missing creations (not installed):\n", "bold")
             for m in sorted(missing):
-                lines.append(f"  - {m}")
+                tw.insert("end", f"  - {m}\n")
 
         if info.get("rules"):
-            lines.append("")
-            lines.append("--- Rules ---")
-            for rule in info["rules"]:
-                plugin = rule.get("plugin", "")
-                after = ", ".join(rule.get("load_after", []))
-                note = rule.get("note", "")
-                lines.append(f"  {plugin} after [{after}]")
-                if note:
-                    lines.append(f"    Note: {note}")
+            is_tier = info.get("book_type") == "tier"
+            installed_lower = {p.lower() for p in self._installed}
 
-        self._detail_text.insert("1.0", "\n".join(lines))
+            def _rule_applicable(rule):
+                p = rule.get("plugin", "").lower()
+                if p not in installed_lower:
+                    return False
+                if is_tier:
+                    return True
+                return any(
+                    d.lower() in installed_lower
+                    for d in rule.get("load_after", [])
+                )
+
+            rules = info["rules"]
+            if self._hide_na_rules:
+                rules = [r for r in rules if _rule_applicable(r)]
+
+            if rules:
+                tw.insert("end", "\n")
+                heading = "Tier Overrides" if is_tier else "Rules"
+                tw.insert("end", f"{heading}\n", "bold")
+                for rule in rules:
+                    plugin = rule.get("plugin", "")
+                    note = rule.get("note", "")
+                    if is_tier:
+                        tier = rule.get("tier", "?")
+                        tw.insert("end", f"  {plugin} \u2192 tier {tier}\n")
+                    else:
+                        after = ", ".join(rule.get("load_after", []))
+                        tw.insert("end", f"  {plugin} after [{after}]\n")
+                    if note:
+                        tw.insert("end", f"    {note}\n", "grey")
+
         self._detail_text.configure(state="disabled")
 
     # --- Actions ---
@@ -384,6 +474,11 @@ class RuleBookTool(ToolModule):
         self._scan_and_populate()
         self._set_status("Rescanned", "green")
 
+    def _toggle_hide_na_rules(self):
+        self._hide_na_rules = self._hide_na_switch.get() == 1
+        # Re-render the currently selected detail panel
+        self._on_select(None)
+
     def _new_book(self):
         from starfield_tool.dialogs.rulebook_editor import RuleBookEditorDialog
         if not self._context:
@@ -409,6 +504,14 @@ class RuleBookTool(ToolModule):
 
         from starfield_tool.dialogs.rulebook_editor import RuleBookEditorDialog
         if not self._context:
+            return
+
+        if info.get("book_type") == "tier":
+            messagebox.showinfo(
+                "Tier Rule Book",
+                "Tier rule books must be edited as JSON files.\n\n"
+                f"Path: {info.get('filepath', '')}",
+            )
             return
 
         readonly = info.get("source") == "curated"

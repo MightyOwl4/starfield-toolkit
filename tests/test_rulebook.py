@@ -4,6 +4,7 @@ import time
 
 from load_order_sorter.rulebook import (
     check_applicability,
+    check_tier_applicability,
     discover_rulebooks,
     load_rulebook,
     normalize_rules,
@@ -258,3 +259,50 @@ def test_reconcile_saved_order_preserved():
     result = reconcile_registry(discovered, saved)
     assert result[0]["filename"] == "b.json"
     assert result[1]["filename"] == "a.json"
+
+
+# --- check_tier_applicability ---
+
+
+def test_tier_applicability_installed():
+    rules = [{"plugin": "A.esm", "tier": 3}]
+    applicable, missing, is_ok = check_tier_applicability(rules, {"A.esm"})
+    assert len(applicable) == 1
+    assert applicable[0]["tier"] == 3
+    assert is_ok is True
+
+
+def test_tier_applicability_missing_plugin():
+    rules = [{"plugin": "A.esm", "tier": 3}]
+    applicable, missing, is_ok = check_tier_applicability(rules, {"B.esm"})
+    assert len(applicable) == 0
+    assert "A.esm" in missing
+    assert is_ok is False
+
+
+def test_tier_applicability_invalid_tier_skipped():
+    rules = [
+        {"plugin": "A.esm", "tier": 99},
+        {"plugin": "B.esm", "tier": 0},
+        {"plugin": "C.esm", "tier": "bad"},
+        {"plugin": "D.esm", "tier": 5},
+    ]
+    applicable, _, is_ok = check_tier_applicability(
+        rules, {"A.esm", "B.esm", "C.esm", "D.esm"}
+    )
+    assert len(applicable) == 1
+    assert applicable[0]["plugin"] == "D.esm"
+    assert is_ok is True
+
+
+def test_tier_applicability_case_insensitive():
+    rules = [{"plugin": "mymod.esm", "tier": 7}]
+    applicable, _, is_ok = check_tier_applicability(rules, {"MyMod.esm"})
+    assert is_ok is True
+    assert applicable[0]["plugin"] == "MyMod.esm"
+
+
+def test_tier_applicability_preserves_note():
+    rules = [{"plugin": "A.esm", "tier": 3, "note": "overhaul mod"}]
+    applicable, _, _ = check_tier_applicability(rules, {"A.esm"})
+    assert applicable[0]["note"] == "overhaul mod"

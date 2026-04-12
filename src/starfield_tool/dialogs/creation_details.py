@@ -46,6 +46,7 @@ class CreationDetailsDialog(ctk.CTkToplevel):
         display_name: str,
         info: "CreationInfo | None",
         thumbnail_image: "PILImage.Image | None" = None,
+        content_id: str = "",
     ):
         super().__init__(parent)
         self.title(f"Details — {display_name}")
@@ -63,9 +64,30 @@ class CreationDetailsDialog(ctk.CTkToplevel):
         if icon.exists():
             self.after(200, lambda: self.iconbitmap(str(icon)))
 
+        self._content_id = content_id
         self._build_ui(display_name, info, thumbnail_image)
 
         self.bind("<Escape>", lambda _e: self.destroy())
+
+    @staticmethod
+    def _bethesda_url(content_id: str, display_name: str) -> str | None:
+        """Build the Bethesda Creations page URL for this creation.
+
+        Format: https://creations.bethesda.net/en/starfield/details/{uuid}/{slug}
+        Returns None if content_id is missing or not a valid UUID-like id.
+        """
+        if not content_id:
+            return None
+        uuid = content_id[3:] if content_id.startswith("TM_") else content_id
+        # Slug: replace non-alphanumeric with underscore, collapse runs
+        import re
+        slug = re.sub(r"[^A-Za-z0-9]+", "_", display_name or "").strip("_")
+        if not slug:
+            slug = "creation"
+        return (
+            f"https://creations.bethesda.net/en/starfield/details/"
+            f"{uuid}/{slug}"
+        )
 
     # ------------------------------------------------------------------
     def _build_ui(
@@ -110,7 +132,26 @@ class CreationDetailsDialog(ctk.CTkToplevel):
             wraplength=350,
             anchor="w",
             justify="left",
-        ).pack(anchor="w", pady=(0, 8))
+        ).pack(anchor="w", pady=(0, 2))
+
+        # Link to Bethesda's Creation page (when we have a content_id)
+        url = self._bethesda_url(self._content_id, display_name)
+        if url:
+            link = ctk.CTkLabel(
+                right_col,
+                text="\u2197 View on creations.bethesda.net",
+                font=ctk.CTkFont(size=11, underline=True),
+                text_color="#7aaaff",
+                cursor="hand2",
+                anchor="w",
+            )
+            link.pack(anchor="w", pady=(0, 8))
+
+            def _open(_event=None, u=url):
+                import webbrowser
+                webbrowser.open(u)
+
+            link.bind("<Button-1>", _open)
 
         # Attributes as a monospace-aligned table
         def _val(value, fallback="n/a"):

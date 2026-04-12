@@ -139,6 +139,37 @@ class TestConstraintMerger:
         decisions = _merge_constraints(constraints)
         assert decisions["mod.esm"].warnings == ["w1", "w2"]
 
+    def test_all_constraints_preserves_winners_and_losers(self):
+        """Every constraint touching a plugin is retained in all_constraints,
+        including the ones that lost tier resolution. The diff dialog's
+        hints view relies on this to explain decisions."""
+        constraints = [
+            SortConstraint(plugin_name="mod.esm", type="tier", tier=5,
+                           sorter_name="CAT", priority=10),
+            SortConstraint(plugin_name="mod.esm", type="tier", tier=3,
+                           sorter_name="RULE:tier_fix.json", priority=30),
+            SortConstraint(plugin_name="mod.esm", type="load_after",
+                           after="base.esm",
+                           sorter_name="RULE:order.json", priority=30),
+            SortConstraint(plugin_name="other.esm", type="tier", tier=5,
+                           sorter_name="CAT", priority=10),
+        ]
+        decisions = _merge_constraints(constraints)
+
+        mod_all = decisions["mod.esm"].all_constraints
+        # Three constraints targeted mod.esm: two tier (one loser, one winner)
+        # and one load_after.
+        assert len(mod_all) == 3
+        sorter_names = {c.sorter_name for c in mod_all}
+        assert sorter_names == {"CAT", "RULE:tier_fix.json", "RULE:order.json"}
+
+        # Winner is the higher-priority tier constraint.
+        assert decisions["mod.esm"].tier == 3
+        assert decisions["mod.esm"].sorter_name == "RULE:tier_fix.json"
+
+        # Other plugin's constraints do NOT leak into mod.esm's list.
+        assert decisions["other.esm"].all_constraints == [constraints[3]]
+
 
 class TestSolver:
     def test_stable_sort_unsorted_items(self):
@@ -333,6 +364,7 @@ class TestMergePartial:
         dialog = object.__new__(DiffDialog)
         dialog._current = current
         dialog._proposed = proposed_items
+        dialog._moved_names = {si.plugin_name for si in proposed_items if si.moved}
         dialog._accepted = {
             si.plugin_name: (si.plugin_name in accepted_names)
             for si in proposed_items if si.moved

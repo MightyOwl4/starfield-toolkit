@@ -99,13 +99,17 @@ class LoadOrderTool(ToolModule):
         heading_bg = "#1f1f1f" if is_dark else "#e0e0e0"
         heading_fg = "#aaaaaa" if is_dark else "#333333"
 
+        from starfield_tool.grid_style import (
+            grid_font, grid_heading_font, grid_rowheight,
+        )
         style = ttk.Style()
         style.configure("LO.Treeview", background=bg, foreground=fg,
-                        fieldbackground=bg, rowheight=28, borderwidth=0,
-                        font=("Segoe UI", 10))
+                        fieldbackground=bg, rowheight=grid_rowheight(extra=4),
+                        borderwidth=0,
+                        font=grid_font())
         style.configure("LO.Treeview.Heading", background=heading_bg,
                         foreground=heading_fg, borderwidth=1, relief="flat",
-                        font=("Segoe UI", 9, "bold"))
+                        font=grid_heading_font())
         style.map("LO.Treeview",
                   background=[("selected", "#314c79")],
                   foreground=[("selected", fg)])
@@ -269,15 +273,7 @@ class LoadOrderTool(ToolModule):
                 self._original_positions[group.key] = src_idx
             self._working_groups.pop(src_idx)
             self._working_groups.insert(dst_idx, group)
-            # Check if group is back at its original saved position
-            saved_idx = next(
-                (i for i, g in enumerate(self._groups) if g.key == group.key), -1
-            )
-            if dst_idx == saved_idx:
-                self._dirty_items.discard(group.key)
-                self._original_positions.pop(group.key, None)
-            else:
-                self._dirty_items.add(group.key)
+            self._recompute_dirty(self._working_groups)
             self._populate_tree()
             # Re-identify the dragged item
             children = self._tree.get_children()
@@ -590,21 +586,31 @@ class LoadOrderTool(ToolModule):
             # Reorder working_groups to match the accepted key order
             key_to_group = {g.key: g for g in self._working_groups}
             new_groups = [key_to_group[k] for k in dialog.result if k in key_to_group]
-            # Rebuild dirty set from scratch — compare each position to saved
-            self._dirty_items.clear()
-            for i, group in enumerate(new_groups):
-                saved_idx = next(
-                    (j for j, g in enumerate(self._groups) if g.key == group.key), -1
-                )
-                if saved_idx != i:
-                    self._dirty_items.add(group.key)
-                    if group.key not in self._original_positions:
-                        self._original_positions[group.key] = saved_idx
-                else:
-                    self._original_positions.pop(group.key, None)
+            self._recompute_dirty(new_groups)
             self._working_groups = new_groups
             self._populate_tree()
             self._update_buttons()
+
+    def _recompute_dirty(self, new_groups: list):
+        """Rebuild dirty set using LCS-based diff against saved order.
+
+        Only items that truly moved (not just shifted because a neighbour
+        moved) are marked dirty.
+        """
+        from starfield_tool.tools.load_order_diff import truly_moved_keys
+
+        saved_keys = [g.key for g in self._groups]
+        new_keys = [g.key for g in new_groups]
+        moved = truly_moved_keys(saved_keys, new_keys)
+
+        self._dirty_items.clear()
+        self._original_positions.clear()
+        for group_key in moved:
+            self._dirty_items.add(group_key)
+            saved_idx = next(
+                (j for j, g in enumerate(self._groups) if g.key == group_key), -1
+            )
+            self._original_positions[group_key] = saved_idx
 
     # --- Snapshots ---
 

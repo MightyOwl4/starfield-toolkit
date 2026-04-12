@@ -28,14 +28,24 @@ _BTN_HOVER = "#3d5f99"
 _WARNING_BG = "#d4a71a"  # Constellation yellow
 _WARNING_FG = "#1a1a1a"
 _NOT_UPDATED_BG = "#d4a71a"  # yellow highlight
+_LIKELY_UPDATED_BG = "#5f7f3a"  # muted green — cautiously optimistic
+_LIKELY_UPDATED_FG = "#ffffff"
 _UNKNOWN_FG = "#888888"
 _SKIN_FG = "#888888"  # muted grey — non-obtrusive marker
 
 # Status constants
 STATUS_UPDATED = "updated"
 STATUS_NOT_UPDATED = "not_updated"
+STATUS_LIKELY_UPDATED = "likely_updated"  # version matches baseline BUT PS
+#                                           support present → almost certainly
+#                                           republished post-Free-Lanes without
+#                                           a version bump.
 STATUS_UNKNOWN = "unknown"
 STATUS_SKIN = "skin"  # excluded from outdated check (skins rarely affected)
+
+# Platform identifiers that prove post-Free-Lanes republish.
+# (Free Lanes + PS5 launch: 2026-04-07)
+_POST_FREE_LANES_PLATFORMS = frozenset({"PLAYSTATION4", "PLAYSTATION5"})
 
 # Input mode constants
 MODE_INSTALLED = "installed"
@@ -132,9 +142,11 @@ def _status_sort_key(row: dict) -> int:
         return 0
     if status == STATUS_UNKNOWN:
         return 1
-    if status == STATUS_SKIN:
+    if status == STATUS_LIKELY_UPDATED:
         return 2
-    return 3  # updated
+    if status == STATUS_SKIN:
+        return 3
+    return 4  # updated
 
 
 # --- Export File Parsers ---
@@ -231,7 +243,7 @@ def _parse_export(filepath: Path) -> tuple[list[dict], bool]:
 # --- Tool Module ---
 
 class FastLaneCheckTool(ToolModule):
-    name = "Fast Lane Creation Check"
+    name = "Fast Lane Compatibility Check"
     description = (
         "Check which installed creations have not been updated since a "
         "pre-Fast-Lanes baseline — identifies mods likely broken by the update"
@@ -279,14 +291,16 @@ class FastLaneCheckTool(ToolModule):
                 snapshot_text = snap[:10]
 
         warning_text = (
-            f"\u26A0 This check is APPROXIMATE. It compares your installed creation "
-            f"versions against a baseline snapshot (dated {snapshot_text}). A creation "
-            f"is flagged as \"not updated\" if its current version exactly matches the "
-            f"baseline — meaning no update has been published since the snapshot. "
-            f"Authors may have released fixes without bumping the version. Skins are "
-            f"excluded from the check as they are unlikely to be affected. For best "
-            f"results, run \"Check for Updates\" in the Installed Creations tab first. "
-            f"Always verify manually before making decisions."
+            f"\u26A0 This check is APPROXIMATE. It compares each creation's current "
+            f"published version (from Bethesda's API) against a baseline snapshot "
+            f"(dated {snapshot_text}). A creation is flagged as \"not updated\" if "
+            f"its current version still exactly matches the baseline. A creation "
+            f"whose version matches the baseline BUT that now lists PlayStation "
+            f"support is reclassified as \"likely updated\" — PS support was only "
+            f"possible after the Free Lanes update (2026-04-07), so the author "
+            f"republished even though they didn't bump the version. Skins are "
+            f"excluded from the check as they are unlikely to be affected. Always "
+            f"verify manually before making decisions."
         )
 
         banner = ctk.CTkFrame(parent, fg_color=_WARNING_BG, corner_radius=4)
@@ -335,7 +349,7 @@ class FastLaneCheckTool(ToolModule):
         )
 
         ctk.CTkButton(
-            inner, text="Import Installed",
+        inner, text="Import Installed creations",
             command=self._import_installed, **_btn_kw,
         ).pack(pady=6)
 
@@ -385,34 +399,39 @@ class FastLaneCheckTool(ToolModule):
         tree_fg = "#dcdcdc" if is_dark else "#1a1a1a"
         sel_bg = "#3d5f99" if is_dark else "#cce0ff"
 
+        from starfield_tool.grid_style import grid_font, grid_rowheight
         style = ttk.Style()
         style.configure(
             "FastLane.Treeview",
             background=tree_bg, foreground=tree_fg,
-            fieldbackground=tree_bg, rowheight=22,
-            font=("Segoe UI", 10),
+            fieldbackground=tree_bg, rowheight=grid_rowheight(),
+            font=grid_font(),
         )
         style.map("FastLane.Treeview", background=[("selected", sel_bg)])
 
         tree_frame = tk.Frame(frame, bg=tree_bg)
         tree_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
-        columns = ("pos", "title", "author", "installed", "baseline", "status")
+        columns = ("pos", "info", "title", "author",
+                   "current", "baseline", "status")
         self._tree = ttk.Treeview(
             tree_frame, columns=columns, show="headings",
             style="FastLane.Treeview", selectmode="browse",
         )
         self._tree.heading("pos", text="#", anchor="w")
+        self._tree.heading("info", text="", anchor="center")
         self._tree.heading("title", text="Title", anchor="w")
         self._tree.heading("author", text="Author", anchor="w")
-        self._tree.heading("installed", text="Installed Version", anchor="w")
+        self._tree.heading("current", text="Current Version", anchor="w")
         self._tree.heading("baseline", text="Baseline Version", anchor="w")
         self._tree.heading("status", text="Status", anchor="w")
 
         self._tree.column("pos", width=50, minwidth=40, anchor="e")
+        self._tree.column("info", width=28, minwidth=22, anchor="center",
+                          stretch=False)
         self._tree.column("title", width=260, minwidth=150)
         self._tree.column("author", width=140, minwidth=100)
-        self._tree.column("installed", width=110, minwidth=80)
+        self._tree.column("current", width=110, minwidth=80)
         self._tree.column("baseline", width=110, minwidth=80)
         self._tree.column("status", width=130, minwidth=100)
 
@@ -421,9 +440,19 @@ class FastLaneCheckTool(ToolModule):
         self._tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+        # Double-click row → show details (if cached info available).
+        # Single-click on the info column → same.
+        self._tree.bind("<Double-1>", self._on_tree_double_click)
+        self._tree.bind("<Button-1>", self._on_tree_click)
+        self._tree.configure(cursor="hand2")
+
         # Tag colors
         self._tree.tag_configure(
             "not_updated", background=_NOT_UPDATED_BG, foreground="#1a1a1a",
+        )
+        self._tree.tag_configure(
+            "likely_updated",
+            background=_LIKELY_UPDATED_BG, foreground=_LIKELY_UPDATED_FG,
         )
         self._tree.tag_configure("unknown", foreground=_UNKNOWN_FG)
         self._tree.tag_configure("skin", foreground=_SKIN_FG)
@@ -455,6 +484,9 @@ class FastLaneCheckTool(ToolModule):
             if status == STATUS_NOT_UPDATED:
                 tags = ("not_updated",)
                 status_text = "Not updated"
+            elif status == STATUS_LIKELY_UPDATED:
+                tags = ("likely_updated",)
+                status_text = "Likely updated (PS)"
             elif status == STATUS_UPDATED:
                 tags = ()
                 status_text = "Updated"
@@ -472,14 +504,25 @@ class FastLaneCheckTool(ToolModule):
             pos = row.get("load_position")
             pos_text = str(pos) if pos is not None else "-"
 
+            # Show API current version (from fetch_info) after the check;
+            # before the check, fall back to installed_version as a hint of
+            # what the row is about.
+            current_display = (
+                row.get("current_version")
+                or row.get("installed_version", "")
+                or "—"
+            )
+            # ⓘ icon visible only when we have cached info for this row
+            info_cell = "\u24d8" if row.get("info") is not None else ""
             self._tree.insert(
                 "", "end",
                 iid=str(i),
                 values=(
                     pos_text,
+                    info_cell,
                     row.get("title", ""),
                     row.get("author", ""),
-                    row.get("installed_version", ""),
+                    current_display,
                     row.get("baseline_version") or "",
                     status_text,
                 ),
@@ -496,12 +539,79 @@ class FastLaneCheckTool(ToolModule):
             )
             return
         not_updated = sum(1 for r in self._rows if r.get("status") == STATUS_NOT_UPDATED)
+        likely = sum(1 for r in self._rows if r.get("status") == STATUS_LIKELY_UPDATED)
         updated = sum(1 for r in self._rows if r.get("status") == STATUS_UPDATED)
         unknown = sum(1 for r in self._rows if r.get("status") == STATUS_UNKNOWN)
         skins = sum(1 for r in self._rows if r.get("status") == STATUS_SKIN)
         self._summary_label.configure(
             text=f"{total} total | {not_updated} not updated | "
-                 f"{updated} updated | {unknown} unknown | {skins} skins"
+                 f"{likely} likely updated | {updated} updated | "
+                 f"{unknown} unknown | {skins} skins"
+        )
+
+    # ----- Row interaction: open details dialog -----
+
+    def _on_tree_double_click(self, event):
+        """Double-click anywhere on a row opens details (if info cached)."""
+        item_id = self._tree.identify_row(event.y)
+        if not item_id:
+            return
+        self._open_details_for_iid(item_id)
+
+    def _on_tree_click(self, event):
+        """Single-click on the info column opens details (if info cached).
+        Other columns fall through to default selection behavior."""
+        region = self._tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        col = self._tree.identify_column(event.x)
+        # Column "#2" is "info" (after "pos" which is "#1")
+        if col != "#2":
+            return
+        item_id = self._tree.identify_row(event.y)
+        if not item_id:
+            return
+        self._open_details_for_iid(item_id)
+        # Prevent the click from also changing selection in an unexpected way
+        return "break"
+
+    def _open_details_for_iid(self, item_id: str):
+        """Safeguarded open: skip silently if the row has no cached info."""
+        try:
+            idx = int(item_id)
+        except ValueError:
+            return
+        if idx < 0 or idx >= len(self._rows):
+            return
+        row = self._rows[idx]
+        info = row.get("info")
+        if info is None:
+            return  # safeguard — no cached info, nothing useful to show
+
+        content_id = row.get("content_id", "")
+        display_name = row.get("title", "") or "Creation"
+
+        # Try to pull a thumbnail from the shared image cache; fall back to
+        # a download if the URL is available.  Failure is non-fatal — the
+        # dialog handles a missing thumbnail.
+        thumb = None
+        if info.thumbnail_url:
+            from starfield_tool.dialogs.creation_details import (
+                download_thumbnail,
+            )
+            try:
+                thumb = download_thumbnail(
+                    info.thumbnail_url, content_id=content_id,
+                )
+            except Exception:
+                thumb = None
+
+        from starfield_tool.dialogs.creation_details import (
+            CreationDetailsDialog,
+        )
+        CreationDetailsDialog(
+            self._tree, display_name, info, thumb,
+            content_id=content_id,
         )
 
     # ----- Actions -----
@@ -550,9 +660,9 @@ class FastLaneCheckTool(ToolModule):
     def _import_snapshot(self):
         """Load a load-order snapshot saved from the Load Order tool.
 
-        Snapshots include `version` per creation (since the format gained
-        the field), so the check runs in MODE_FILE — comparing the saved
-        installed version against the baseline without any API calls.
+        The saved installed_version is retained for reference only; the
+        check itself always queries the API for each creation's current
+        published version and compares that against the baseline.
         """
         path_str = filedialog.askopenfilename(
             title="Load Load-Order Snapshot",
@@ -660,14 +770,11 @@ class FastLaneCheckTool(ToolModule):
         if not self._rows:
             return
 
-        if self._source_mode == MODE_FILE:
-            # File mode: no API calls — use exported installed_version as current
-            self._run_comparison({})
-            return
-
-        # Installed mode: fetch current versions via the shared creations client.
-        # The client transparently reuses entries fetched during the current
-        # session and re-fetches anything older.
+        # Always compare API's current version against the baseline, in both
+        # file and installed modes.  The tool's question is "has the author
+        # updated this post-baseline?" — that's API-vs-baseline, not
+        # what-happens-to-be-installed.  The exported installed_version is
+        # retained as reference-only in the row data.
         if not self._context:
             return
         self._context.status_bar.set_task("Fast Lane Check: fetching current versions...")
@@ -723,22 +830,34 @@ class FastLaneCheckTool(ToolModule):
             baseline_version = baseline_entry.get("v", "")
             row["baseline_version"] = baseline_version
 
-            # Determine current version per mode
-            if self._source_mode == MODE_INSTALLED:
-                info = info_map.get(row["content_id"])
-                current_version = info.version if info else None
-            else:
-                # File mode: use the exported installed version as current
-                current_version = row.get("installed_version")
-
+            # Current version always comes from the API — the tool's purpose
+            # is "has the mod author published a post-baseline version?",
+            # which only API-current-vs-baseline can answer.  The exported
+            # installed_version (if any) stays on the row for display but
+            # doesn't drive classification.
+            info = info_map.get(row["content_id"])
+            row["info"] = info  # stored for the details dialog
+            current_version = info.version if info else None
             row["current_version"] = current_version
+            # Record PS support for the PS-override below and for display.
+            platforms = info.platforms if info else []
+            row["platforms"] = platforms
+            has_ps = any(p in _POST_FREE_LANES_PLATFORMS for p in platforms)
+            row["has_ps_support"] = has_ps
             # Skins are excluded from the outdated check — they almost never
             # break across game updates. We still surface them with a low-key
             # marker so the user knows the row was recognised.
             if baseline_entry.get("s") == 1:
                 row["status"] = STATUS_SKIN
             else:
-                row["status"] = _classify(current_version, baseline_version)
+                status = _classify(current_version, baseline_version)
+                # PS support implies post-Free-Lanes republish.  If the
+                # version still matches the baseline, the author republished
+                # (for PS) without bumping the version — a stale-version
+                # alert here would be a false positive.
+                if status == STATUS_NOT_UPDATED and has_ps:
+                    status = STATUS_LIKELY_UPDATED
+                row["status"] = status
 
         # Preserve load order — do NOT sort. Rows stay in the order they were
         # loaded (installed: game's load order; file: export's row order).

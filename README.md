@@ -3,6 +3,8 @@
 </p>
 <h1 align="center">Starfield Toolkit</h1>
 
+> **Disclaimer:** Starfield Toolkit is an unofficial, community-built tool. It is **not affiliated with, endorsed by, or sponsored by Bethesda Softworks, ZeniMax Media, or Microsoft**. "Starfield" and "Bethesda" are trademarks of their respective owners; all game assets, creation metadata, and API endpoints remain the property of those rights holders. This project simply provides a convenience UI over publicly accessible information.
+
 > **This tool is designed for Bethesda Creations only.**
 > If you use Nexus Mods with a mod manager like Vortex or MO2, those tools already provide load order management, update checking, and more. This project is not intended to replace them.
 

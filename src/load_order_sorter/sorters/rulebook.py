@@ -1,10 +1,16 @@
-"""Rule book sorter — produces load_after constraints from user and curated rule books."""
+"""Rule book sorter — produces constraints from user and curated rule books.
+
+Supports two book types (determined by the ``"type"`` field in the JSON):
+- ``"order"`` (default): produces ``load_after`` constraints from ordering rules.
+- ``"tier"``: produces ``tier`` constraints that override the category sorter.
+"""
 import logging
 from pathlib import Path
 
 from load_order_sorter.models import SortItem, SortConstraint
 from load_order_sorter.rulebook import (
     check_applicability,
+    check_tier_applicability,
     discover_rulebooks,
     load_rulebook,
     normalize_rules,
@@ -69,32 +75,62 @@ def sort(
             log.warning("Corrupted rule book: %s", entry["filename"])
             continue
 
-        rules = normalize_rules(book.get("rules", []))
-        applicable, _missing, is_applicable = check_applicability(
-            rules, installed_set
-        )
-        if not is_applicable:
-            continue
-
         # Determine priority
         if entry["source"] == "curated":
             priority = PRIORITY_CURATED
-            sorter_name = SORTER_NAME_CURATED
         else:
             priority = PRIORITY_USER_BASE + user_position
-            sorter_name = SORTER_NAME_USER
             user_position += 1
 
-        # Produce constraints
-        for rule in applicable:
-            plugin = rule["plugin"]
-            for dep in rule.get("load_after", []):
+        # Qualify sorter_name with the rulebook filename so the diff
+        # dialog's hints view can show which book contributed each hint.
+        filename = entry["filename"]
+        sorter_name = f"RULE:{filename}"
+
+        book_type = book.get("type", "order")
+
+        if book_type == "tier":
+            # Tier book: emit tier constraints directly
+            applicable, _missing, is_applicable = check_tier_applicability(
+                book.get("rules", []), installed_set
+            )
+            if not is_applicable:
+                continue
+            for rule in applicable:
+                tier = rule["tier"]
                 constraints.append(SortConstraint(
-                    plugin_name=plugin,
-                    type="load_after",
-                    after=dep,
-                    sorter_name=sorter_name,
+                    plugin_name=rule["plugin"],
+                    type="tier",
+                    tier=tier,
+                    sorter_name=f"{sorter_name}({tier})",
                     priority=priority,
+                    note=rule.get("note", ""),
                 ))
+        else:
+            # Order book (default): emit load_after constraints.
+            # normalize_rules merges notes per plugin; look them up by name.
+            raw_rules = book.get("rules", [])
+            notes_by_plugin = {
+                r.get("plugin", ""): r.get("note", "")
+                for r in raw_rules if r.get("note")
+            }
+            rules = normalize_rules(raw_rules)
+            applicable, _missing, is_applicable = check_applicability(
+                rules, installed_set
+            )
+            if not is_applicable:
+                continue
+            for rule in applicable:
+                plugin = rule["plugin"]
+                rule_note = notes_by_plugin.get(plugin, "") or rule.get("note", "")
+                for dep in rule.get("load_after", []):
+                    constraints.append(SortConstraint(
+                        plugin_name=plugin,
+                        type="load_after",
+                        after=dep,
+                        sorter_name=sorter_name,
+                        priority=priority,
+                        note=rule_note,
+                    ))
 
     return constraints

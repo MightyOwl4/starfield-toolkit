@@ -123,6 +123,41 @@ def check_applicability(
     return applicable, missing, is_applicable
 
 
+def check_tier_applicability(
+    rules: list[dict], installed_plugins: set[str]
+) -> tuple[list[dict], set[str], bool]:
+    """Check which tier rules are applicable given installed plugins.
+
+    Tier rules only need the plugin itself to be installed (no dependency
+    targets to filter).
+
+    Returns:
+        (applicable_rules, missing_plugins, is_applicable)
+    """
+    installed_lower = {p.lower(): p for p in installed_plugins}
+    missing: set[str] = set()
+    applicable: list[dict] = []
+
+    for rule in rules:
+        plugin = rule.get("plugin", "")
+        canonical = installed_lower.get(plugin.lower())
+        if not canonical:
+            missing.add(plugin)
+            continue
+
+        tier = rule.get("tier")
+        if not isinstance(tier, int) or not 1 <= tier <= 11:
+            continue
+
+        applicable.append({
+            "plugin": canonical,
+            "tier": tier,
+            "note": rule.get("note", ""),
+        })
+
+    return applicable, missing, len(applicable) >= 1
+
+
 def discover_rulebooks(
     user_dir: Path, curated_dir: Path | None = None
 ) -> list[dict]:
