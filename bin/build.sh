@@ -41,6 +41,22 @@ else
     echo "Warning: Building without LOOT masterlist."
 fi
 
+# Bundle curated rule books if they exist
+RULES_DIR="$PROJECT_ROOT\\data\\rules"
+RULES_DATA_FLAG=""
+if [ -d "$RULES_DIR" ] && ls "$RULES_DIR"/*.json 1>/dev/null 2>&1; then
+    RULES_DATA_FLAG="--add-data ${RULES_DIR}${PATHSEP}data/rules"
+    echo "Curated rule books bundled."
+fi
+
+# Bundle Fast Lane baseline catalogue if it exists (feature 009)
+BASELINE_FILE="$PROJECT_ROOT\\data\\creations_baseline.json"
+BASELINE_DATA_FLAG=""
+if [ -f "$BASELINE_FILE" ]; then
+    BASELINE_DATA_FLAG="--add-data ${BASELINE_FILE}${PATHSEP}data"
+    echo "Fast Lane baseline bundled."
+fi
+
 echo "Running PyInstaller..."
 uv run pyinstaller \
     --onefile \
@@ -54,6 +70,8 @@ uv run pyinstaller \
     --hidden-import _version \
     --add-data "$PROJECT_ROOT\\_version.py${PATHSEP}." \
     $LOOT_DATA_FLAG \
+    $RULES_DATA_FLAG \
+    $BASELINE_DATA_FLAG \
     "$PROJECT_ROOT\\src\\starfield_tool\\__main__.py"
 
 echo "=== Build complete: $DIST_DIR\\StarfieldToolkit.exe ==="

@@ -20,6 +20,7 @@ class _CreationGroup:
     files: list[str] = field(default_factory=list)  # all plugin files in order
     content_id: str = ""
     categories: list[str] = field(default_factory=list)
+    installed_version: str = ""
 
     @property
     def plugin_label(self) -> str:
@@ -98,13 +99,17 @@ class LoadOrderTool(ToolModule):
         heading_bg = "#1f1f1f" if is_dark else "#e0e0e0"
         heading_fg = "#aaaaaa" if is_dark else "#333333"
 
+        from starfield_tool.grid_style import (
+            grid_font, grid_heading_font, grid_rowheight,
+        )
         style = ttk.Style()
         style.configure("LO.Treeview", background=bg, foreground=fg,
-                        fieldbackground=bg, rowheight=28, borderwidth=0,
-                        font=("Segoe UI", 10))
+                        fieldbackground=bg, rowheight=grid_rowheight(extra=4),
+                        borderwidth=0,
+                        font=grid_font())
         style.configure("LO.Treeview.Heading", background=heading_bg,
                         foreground=heading_fg, borderwidth=1, relief="flat",
-                        font=("Segoe UI", 9, "bold"))
+                        font=grid_heading_font())
         style.map("LO.Treeview",
                   background=[("selected", "#314c79")],
                   foreground=[("selected", fg)])
@@ -215,6 +220,7 @@ class LoadOrderTool(ToolModule):
                     display_name=entry.title,
                     files=entry_files,
                     content_id=entry.content_id,
+                    installed_version=entry.version,
                 ))
             elif entry is None:
                 # Plugin not in catalog — standalone
@@ -267,15 +273,7 @@ class LoadOrderTool(ToolModule):
                 self._original_positions[group.key] = src_idx
             self._working_groups.pop(src_idx)
             self._working_groups.insert(dst_idx, group)
-            # Check if group is back at its original saved position
-            saved_idx = next(
-                (i for i, g in enumerate(self._groups) if g.key == group.key), -1
-            )
-            if dst_idx == saved_idx:
-                self._dirty_items.discard(group.key)
-                self._original_positions.pop(group.key, None)
-            else:
-                self._dirty_items.add(group.key)
+            self._recompute_dirty(self._working_groups)
             self._populate_tree()
             # Re-identify the dragged item
             children = self._tree.get_children()
@@ -283,7 +281,12 @@ class LoadOrderTool(ToolModule):
                 self._drag_item = children[dst_idx]
             self._update_buttons()
 
-    def _on_drag_end(self, _event):
+    def _on_drag_end(self, event):
+        if self._drag_item is None:
+            # No drag occurred — check if click was on empty space
+            item = self._tree.identify_row(event.y)
+            if not item:
+                self._tree.selection_remove(*self._tree.selection())
         self._drag_item = None
 
     # --- Apply / Discard ---
@@ -307,6 +310,15 @@ class LoadOrderTool(ToolModule):
                 "Close Starfield before applying load order changes.",
             )
             return
+
+        # TES4 master dependency validation (non-bypassable)
+        tes4_violations = self._validate_tes4_order()
+        if tes4_violations:
+            from load_order_sorter.validation import format_violations
+            msg = format_violations(tes4_violations)
+            messagebox.showwarning("Load Order Violation", msg)
+            return
+
         plugins_path = self._context.game_installation.plugins_txt
         try:
             # Preserve the * prefix for active plugins
@@ -338,6 +350,49 @@ class LoadOrderTool(ToolModule):
             self._tree.after(2000, lambda: self._status_label.configure(text=""))
         except OSError as e:
             messagebox.showerror("Write Error", f"Cannot write Plugins.txt: {e}")
+
+    def _validate_tes4_order(self):
+        """Check proposed order against TES4 master dependencies.
+
+        Returns list of violations, or empty list if order is valid.
+        Builds the master map on demand if not cached from auto-sort.
+        """
+        from load_order_sorter.validation import validate_tes4_order
+        from load_order_sorter.tes4_parser import build_master_map
+
+        if not self._context or not self._context.game_installation:
+            return []
+
+        # Build master map if not cached
+        master_map = getattr(self, "_tes4_master_map", None)
+        if master_map is None:
+            data_dir = self._context.game_installation.data_dir
+            installed_plugins = {
+                g.key: g.content_id or g.key
+                for g in self._working_groups
+            }
+            master_map = build_master_map(data_dir, installed_plugins)
+            self._tes4_master_map = master_map
+
+        if not master_map:
+            return []
+
+        plugin_order = [f for g in self._working_groups for f in g.files]
+        display_names = {g.key: g.display_name for g in self._working_groups}
+        return validate_tes4_order(plugin_order, master_map, display_names)
+
+    def _get_curated_rules_dir(self) -> Path | None:
+        """Find the curated rule books directory (bundled or dev)."""
+        import sys
+        if hasattr(sys, "_MEIPASS"):
+            p = Path(sys._MEIPASS) / "data" / "rules"
+            if p.is_dir():
+                return p
+        # Dev mode: check project root
+        dev_path = Path(__file__).parent.parent.parent.parent / "data" / "rules"
+        if dev_path.is_dir():
+            return dev_path
+        return None
 
     def _discard(self):
         self._working_groups = list(self._groups)
@@ -382,6 +437,7 @@ class LoadOrderTool(ToolModule):
                 client = _make_client(
                     self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 queries = [
                     ContentQuery(
@@ -417,8 +473,45 @@ class LoadOrderTool(ToolModule):
             if loot_available:
                 active.append("loot")
 
-            result = sort_creations(items, sorters=active,
-                                    masterlist_path=masterlist_path)
+            # TES4 master dependency sorter (highest priority)
+            game_data_dir = None
+            installed_plugins = None
+            if self._context and self._context.game_installation:
+                game_data_dir = self._context.game_installation.data_dir
+                installed_plugins = {
+                    g.key: g.content_id or g.key
+                    for g in groups_snapshot
+                }
+                active.append("tes4")
+
+            # Rule book sorter
+            user_rules_dir = None
+            curated_rules_dir = None
+            rb_registry = None
+            if installed_plugins:
+                from starfield_tool.config import _config_path, load_config
+                user_rules_dir = _config_path().parent / "rules"
+                curated_rules_dir = self._get_curated_rules_dir()
+                rb_registry = load_config().rulebook_registry
+                active.append("rulebook")
+
+            result = sort_creations(
+                items,
+                sorters=active,
+                masterlist_path=masterlist_path,
+                data_dir=game_data_dir,
+                installed_plugins=installed_plugins,
+                user_rules_dir=user_rules_dir,
+                curated_rules_dir=curated_rules_dir,
+                rulebook_registry=rb_registry,
+            )
+
+            # Cache TES4 master map for apply validation
+            if game_data_dir and installed_plugins:
+                from load_order_sorter.tes4_parser import build_master_map
+                self._tes4_master_map = build_master_map(
+                    game_data_dir, installed_plugins
+                )
 
             self._tree.after(
                 0, lambda: self._on_sort_complete(result, loot_available)
@@ -493,21 +586,31 @@ class LoadOrderTool(ToolModule):
             # Reorder working_groups to match the accepted key order
             key_to_group = {g.key: g for g in self._working_groups}
             new_groups = [key_to_group[k] for k in dialog.result if k in key_to_group]
-            # Rebuild dirty set from scratch — compare each position to saved
-            self._dirty_items.clear()
-            for i, group in enumerate(new_groups):
-                saved_idx = next(
-                    (j for j, g in enumerate(self._groups) if g.key == group.key), -1
-                )
-                if saved_idx != i:
-                    self._dirty_items.add(group.key)
-                    if group.key not in self._original_positions:
-                        self._original_positions[group.key] = saved_idx
-                else:
-                    self._original_positions.pop(group.key, None)
+            self._recompute_dirty(new_groups)
             self._working_groups = new_groups
             self._populate_tree()
             self._update_buttons()
+
+    def _recompute_dirty(self, new_groups: list):
+        """Rebuild dirty set using LCS-based diff against saved order.
+
+        Only items that truly moved (not just shifted because a neighbour
+        moved) are marked dirty.
+        """
+        from starfield_tool.tools.load_order_diff import truly_moved_keys
+
+        saved_keys = [g.key for g in self._groups]
+        new_keys = [g.key for g in new_groups]
+        moved = truly_moved_keys(saved_keys, new_keys)
+
+        self._dirty_items.clear()
+        self._original_positions.clear()
+        for group_key in moved:
+            self._dirty_items.add(group_key)
+            saved_idx = next(
+                (j for j, g in enumerate(self._groups) if g.key == group_key), -1
+            )
+            self._original_positions[group_key] = saved_idx
 
     # --- Snapshots ---
 
@@ -528,6 +631,7 @@ class LoadOrderTool(ToolModule):
                 content_id=g.content_id or g.key,
                 display_name=g.display_name,
                 files=g.files,
+                installed_version=g.installed_version,
             )
             for g in self._working_groups
         ]

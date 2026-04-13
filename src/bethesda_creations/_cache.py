@@ -62,6 +62,7 @@ def info_to_entry(info: CreationInfo) -> dict:
         "installation_size": info.installation_size,
         "last_updated": info.last_updated,
         "created_on": info.created_on,
+        "platforms": info.platforms,
     }
 
 
@@ -79,6 +80,7 @@ def entry_to_info(entry: dict) -> CreationInfo:
         categories=entry.get("categories", []),
         achievement_friendly=entry.get("achievement_friendly", False),
         thumbnail_url=entry.get("thumbnail_url"),
+        platforms=entry.get("platforms", []),
     )
 
 

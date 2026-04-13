@@ -3,6 +3,8 @@
 </p>
 <h1 align="center">Starfield Toolkit</h1>
 
+> **Disclaimer:** Starfield Toolkit is an unofficial, community-built tool. It is **not affiliated with, endorsed by, or sponsored by Bethesda Softworks, ZeniMax Media, or Microsoft**. "Starfield" and "Bethesda" are trademarks of their respective owners; all game assets, creation metadata, and API endpoints remain the property of those rights holders. This project simply provides a convenience UI over publicly accessible information.
+
 > **This tool is designed for Bethesda Creations only.**
 > If you use Nexus Mods with a mod manager like Vortex or MO2, those tools already provide load order management, update checking, and more. This project is not intended to replace them.
 
@@ -10,6 +12,17 @@ Starfield Toolkit is a lightweight Windows GUI to help managing official Bethesd
 
 The sole reason for its existence is that some operations are frustratingly non-user-friendly in-game and on the site, e.g. you have no other way to check for pending updates than walking through all creations in your library one by one.
 This toolbox tries to provide solutions to issues like this without messing with the game itself.
+
+# System requirements
+1. **Windows**
+2. Starfield installed via Steam
+3. Using only mods from the Bethesda official creations store
+
+No other options are supported, nor planned.
+
+> **Mods from Nexus or other sources, installed manually or via Vortex/MO2 WILL BREAK the app !**
+> It heavily relies on information from the creations pages to do its job, missing that will result in unexpected behaviour
+
 
 # Download
 

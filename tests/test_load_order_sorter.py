@@ -139,6 +139,37 @@ class TestConstraintMerger:
         decisions = _merge_constraints(constraints)
         assert decisions["mod.esm"].warnings == ["w1", "w2"]
 
+    def test_all_constraints_preserves_winners_and_losers(self):
+        """Every constraint touching a plugin is retained in all_constraints,
+        including the ones that lost tier resolution. The diff dialog's
+        hints view relies on this to explain decisions."""
+        constraints = [
+            SortConstraint(plugin_name="mod.esm", type="tier", tier=5,
+                           sorter_name="CAT", priority=10),
+            SortConstraint(plugin_name="mod.esm", type="tier", tier=3,
+                           sorter_name="RULE:tier_fix.json", priority=30),
+            SortConstraint(plugin_name="mod.esm", type="load_after",
+                           after="base.esm",
+                           sorter_name="RULE:order.json", priority=30),
+            SortConstraint(plugin_name="other.esm", type="tier", tier=5,
+                           sorter_name="CAT", priority=10),
+        ]
+        decisions = _merge_constraints(constraints)
+
+        mod_all = decisions["mod.esm"].all_constraints
+        # Three constraints targeted mod.esm: two tier (one loser, one winner)
+        # and one load_after.
+        assert len(mod_all) == 3
+        sorter_names = {c.sorter_name for c in mod_all}
+        assert sorter_names == {"CAT", "RULE:tier_fix.json", "RULE:order.json"}
+
+        # Winner is the higher-priority tier constraint.
+        assert decisions["mod.esm"].tier == 3
+        assert decisions["mod.esm"].sorter_name == "RULE:tier_fix.json"
+
+        # Other plugin's constraints do NOT leak into mod.esm's list.
+        assert decisions["other.esm"].all_constraints == [constraints[3]]
+
 
 class TestSolver:
     def test_stable_sort_unsorted_items(self):
@@ -284,6 +315,43 @@ class TestSnapshot:
         except ValueError:
             pass
 
+    def test_round_trip_with_versions(self, tmp_path):
+        """installed_version round-trips through save/load."""
+        from load_order_sorter.models import SnapshotEntry
+        path = tmp_path / "snapshot.json"
+        entries = [
+            SnapshotEntry("id-1", "Mod A", ["a.esm"], installed_version="1.2.3"),
+            SnapshotEntry("id-2", "Mod B", ["b.esm"], installed_version="2.0"),
+        ]
+        save_snapshot("Versioned", entries, path, "1.0")
+
+        snap = load_snapshot(path)
+        assert snap.entries[0].installed_version == "1.2.3"
+        assert snap.entries[1].installed_version == "2.0"
+
+    def test_save_omits_empty_version(self, tmp_path):
+        """Entries with no version don't write a 'version' key (keeps file lean)."""
+        from load_order_sorter.models import SnapshotEntry
+        path = tmp_path / "snapshot.json"
+        save_snapshot("test", [
+            SnapshotEntry("id-1", "Mod A", ["a.esm"]),  # no version
+        ], path, "1.0")
+
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        assert "version" not in raw["creations"][0]
+
+    def test_legacy_snapshot_without_version_field_loads(self, tmp_path):
+        """Snapshots saved before the version field gain an empty value."""
+        f = tmp_path / "old.json"
+        f.write_text(json.dumps({
+            "name": "old",
+            "creations": [
+                {"id": "id-1", "name": "Mod A", "files": ["a.esm"]},
+            ],
+        }), encoding="utf-8")
+        snap = load_snapshot(f)
+        assert snap.entries[0].installed_version == ""
+
 
 class TestMergePartial:
     """Tests for the diff dialog's partial-accept merge logic."""
@@ -296,6 +364,7 @@ class TestMergePartial:
         dialog = object.__new__(DiffDialog)
         dialog._current = current
         dialog._proposed = proposed_items
+        dialog._moved_names = {si.plugin_name for si in proposed_items if si.moved}
         dialog._accepted = {
             si.plugin_name: (si.plugin_name in accepted_names)
             for si in proposed_items if si.moved

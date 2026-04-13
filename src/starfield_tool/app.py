@@ -64,6 +64,7 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._app_start_time = time.monotonic()
+        self._app_start_wall = time.time()
         self._game_install: GameInstallation | None = None
         self._module_instances: list = []
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
@@ -273,6 +274,7 @@ class App(ctk.CTk):
                 status_bar=self._status_bar,
                 content_frame=content,
                 app_start_time=self._app_start_time,
+                app_start_wall=self._app_start_wall,
             )
             module.initialize(context)
             self._module_instances.append(module)
@@ -342,6 +344,7 @@ class App(ctk.CTk):
     def _show_settings_menu(self, event=None):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Change game path...", command=self._settings_change_path)
+        menu.add_command(label="Grid font size...", command=self._settings_grid_font_size)
         menu.add_command(label="Clear creations cache", command=self._settings_clear_cache)
         menu.add_command(label="Clear image cache", command=self._settings_clear_image_cache)
         menu.add_separator()
@@ -379,6 +382,102 @@ class App(ctk.CTk):
         self._status_bar.set_task("Cache cleared")
         self.after(2000, self._status_bar.clear_task)
 
+    def _settings_grid_font_size(self):
+        """Prompt the user for a grid font size and save to config.
+
+        Deferred via `after` so the popup menu fully dismisses (releases
+        grab) before the modal dialog tries to take it — otherwise the
+        dialog buttons are unresponsive and askinteger returns None.
+        """
+        self.after(50, self._grid_font_size_dialog)
+
+    def _grid_font_size_dialog(self):
+        """Custom CTkToplevel prompt — avoids tkinter.simpledialog which
+        uses transient+grab and disappears on Win+D."""
+        import customtkinter as ctk
+        from starfield_tool.dialogs import center_dialog
+
+        settings = load_config()
+        current = settings.grid_font_size
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Grid font size")
+        dlg.minsize(320, 160)
+        center_dialog(dlg, 340, 170)
+        # Regular taskbar window — survives Win+D
+        dlg.attributes("-topmost", True)
+        dlg.after(100, lambda: dlg.attributes("-topmost", False))
+
+        icon = _icon_path()
+        if icon.exists():
+            dlg.after(200, lambda: dlg.iconbitmap(str(icon)))
+
+        ctk.CTkLabel(
+            dlg, text="Font size for all data grids (7–18):",
+            font=ctk.CTkFont(size=12),
+        ).pack(padx=16, pady=(16, 6), anchor="w")
+
+        value_var = tk.StringVar(value=str(current))
+        entry = ctk.CTkEntry(
+            dlg, textvariable=value_var, width=80,
+            font=ctk.CTkFont(size=12),
+        )
+        entry.pack(padx=16, pady=(0, 10), anchor="w")
+        entry.focus_set()
+        entry.select_range(0, "end")
+
+        btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_row.pack(padx=16, pady=(0, 14), fill="x")
+
+        _btn_kw = dict(height=26, corner_radius=4,
+                       font=ctk.CTkFont(size=12),
+                       fg_color="#314c79", hover_color="#3d5f99")
+
+        def _apply():
+            from tkinter import messagebox
+            raw = value_var.get().strip()
+            try:
+                new_size = int(raw)
+            except ValueError:
+                messagebox.showerror(
+                    "Invalid value",
+                    f"'{raw}' is not a number.",
+                    parent=dlg,
+                )
+                return
+            if not 7 <= new_size <= 18:
+                messagebox.showerror(
+                    "Out of range",
+                    "Font size must be between 7 and 18.",
+                    parent=dlg,
+                )
+                return
+            if new_size != current:
+                settings.grid_font_size = new_size
+                save_config(settings)
+                # Live refresh — re-apply font+rowheight across every
+                # Treeview style used in the app.
+                from starfield_tool.grid_style import refresh_all_grid_styles
+                refresh_all_grid_styles()
+                self._status_bar.set_task(
+                    f"Grid font set to {new_size}pt")
+                self.after(3000, self._status_bar.clear_task)
+            dlg.destroy()
+
+        def _cancel():
+            dlg.destroy()
+
+        ctk.CTkButton(
+            btn_row, text="OK", width=70, command=_apply, **_btn_kw,
+        ).pack(side="right", padx=(6, 0))
+        ctk.CTkButton(
+            btn_row, text="Cancel", width=70, command=_cancel, **_btn_kw,
+        ).pack(side="right")
+
+        dlg.bind("<Return>", lambda _e: _apply())
+        dlg.bind("<Escape>", lambda _e: _cancel())
+        dlg.protocol("WM_DELETE_WINDOW", _cancel)
+
     def _settings_clear_image_cache(self):
         from starfield_tool.dialogs.image_cache import clear_image_cache
         clear_image_cache()
@@ -398,7 +497,11 @@ class App(ctk.CTk):
             f"Starfield Toolkit — {ver}\n\n"
             "https://github.com/MightyOwl4/starfield-toolkit\n\n"
             "A lightweight tool for managing Bethesda Creations\n"
-            "in Starfield — load order, updates, and achievements.",
+            "in Starfield — load order, updates, and achievements.\n\n"
+            "This is an unofficial, community-built tool. It is not\n"
+            "affiliated with, endorsed by, or sponsored by Bethesda\n"
+            "Softworks, ZeniMax Media, or Microsoft. \"Starfield\" and\n"
+            "\"Bethesda\" are trademarks of their respective owners.",
         )
 
     def _on_close(self):

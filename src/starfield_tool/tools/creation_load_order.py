@@ -147,14 +147,17 @@ class CreationLoadOrderTool(ToolModule):
         # Style treeview to match dark/light theme
         style = ttk.Style()
         style.theme_use("default")
+        from starfield_tool.grid_style import (
+            grid_font, grid_heading_font, grid_rowheight,
+        )
         style.configure(
             "Treeview",
             background=bg,
             foreground=fg,
             fieldbackground=bg,
-            rowheight=28,
+            rowheight=grid_rowheight(extra=4),
             borderwidth=0,
-            font=("Segoe UI", 10),
+            font=grid_font(),
         )
         style.configure(
             "Treeview.Heading",
@@ -162,7 +165,7 @@ class CreationLoadOrderTool(ToolModule):
             foreground=heading_fg,
             borderwidth=1,
             relief="flat",
-            font=("Segoe UI", 9, "bold"),
+            font=grid_heading_font(),
         )
         style.map(
             "Treeview",
@@ -210,6 +213,7 @@ class CreationLoadOrderTool(ToolModule):
         self._tree.pack(side="left", fill="both", expand=True)
         self._tree.configure(cursor="hand2")
         self._tree.bind("<Double-1>", lambda _e: self._show_details())
+        self._tree.bind("<Button-1>", self._on_click_deselect)
         scrollbar.pack(side="right", fill="y")
 
         # Rich media scrollable frame (hidden initially)
@@ -279,7 +283,10 @@ class CreationLoadOrderTool(ToolModule):
         from starfield_tool.creations import get_cached_info
         from bethesda_creations._version_cmp import compare_versions
 
-        cached = get_cached_info(self._context.app_start_time)
+        cached = get_cached_info(
+            self._context.app_start_time,
+            self._context.app_start_wall,
+        )
         if not cached:
             self._checked = False
             self._achievements_checked = False
@@ -379,6 +386,7 @@ class CreationLoadOrderTool(ToolModule):
                 updated = check_for_updates(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 # Schedule UI update on the main thread
                 self._tree.after(0, lambda: self._on_updates_complete(updated))
@@ -457,6 +465,7 @@ class CreationLoadOrderTool(ToolModule):
                 updated = check_achievements(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 self._tree.after(0, lambda: self._on_achievements_complete(updated))
             except Exception:
@@ -511,6 +520,12 @@ class CreationLoadOrderTool(ToolModule):
         self._achiev_btn.configure(state="normal")
         self._achiev_clear.pack(side="left", padx=(4, 0))
 
+    def _on_click_deselect(self, event):
+        """Deselect when clicking on empty area of the treeview."""
+        item = self._tree.identify_row(event.y)
+        if not item:
+            self._tree.selection_remove(*self._tree.selection())
+
     # -- Details dialog ------------------------------------------------
 
     def _show_details(self):
@@ -530,7 +545,10 @@ class CreationLoadOrderTool(ToolModule):
                     info.thumbnail_url, content_id=creation.content_id,
                 )
         from starfield_tool.dialogs.creation_details import CreationDetailsDialog
-        CreationDetailsDialog(self._tree, creation.display_name, info, thumb)
+        CreationDetailsDialog(
+            self._tree, creation.display_name, info, thumb,
+            content_id=creation.content_id,
+        )
 
     def _get_selected_creation(self) -> Creation | None:
         """Return the creation currently selected in the active grid mode."""
@@ -754,6 +772,7 @@ class CreationLoadOrderTool(ToolModule):
         from starfield_tool.dialogs.creation_details import CreationDetailsDialog
         CreationDetailsDialog(
             self._media_frame, creation.display_name, info, thumb,
+            content_id=creation.content_id,
         )
 
     def _download_thumbnails(self):
@@ -855,6 +874,7 @@ class CreationLoadOrderTool(ToolModule):
                 check_for_updates(
                     self._creations, self._context.status_bar,
                     self._context.app_start_time,
+                    self._context.app_start_wall,
                 )
                 if self._media_frame and self._media_frame.winfo_exists():
                     self._media_frame.after(0, self._on_cache_fetch_complete)
@@ -918,9 +938,12 @@ class CreationLoadOrderTool(ToolModule):
         for c in self._creations:
             pos = str(c.load_position + 1) if c.load_position is not None else "-"
             date = c.timestamp.strftime("%d %b %Y") if c.timestamp else ""
-            rows.append((pos, c.display_name, c.author, c.installed_version, date))
+            rows.append((
+                pos, c.content_id, c.display_name, c.author,
+                c.installed_version, date,
+            ))
 
-        headers = ("#", "Name", "Author", "Version", "Date")
+        headers = ("#", "Content ID", "Name", "Author", "Installed Version", "Date")
 
         if path.endswith(".csv"):
             import csv

@@ -23,6 +23,7 @@ class SortConstraint:
     sorter_name: str = ""
     priority: int = 0  # higher = wins on conflict
     warnings: list[str] = field(default_factory=list)
+    note: str = ""  # optional explanatory text from the source (e.g., rulebook)
 
 
 @dataclass
@@ -31,7 +32,12 @@ class SortDecision:
     tier: int = 9  # default tier
     sorter_name: str = ""
     load_after: list[str] = field(default_factory=list)
+    load_after_sorters: dict[str, str] = field(default_factory=dict)  # dep → sorter name
     warnings: list[str] = field(default_factory=list)
+    # Every constraint that targeted this plugin during merge, winners and losers.
+    # Populated by pipeline._merge_constraints. Used by the diff dialog's hints
+    # view to explain the decision without re-running sorters.
+    all_constraints: list[SortConstraint] = field(default_factory=list)
 
 
 @dataclass
@@ -59,6 +65,7 @@ class SnapshotEntry:
     content_id: str
     display_name: str
     files: list[str] = field(default_factory=list)
+    installed_version: str = ""
 
 
 @dataclass

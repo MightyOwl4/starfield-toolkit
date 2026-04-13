@@ -21,10 +21,12 @@ class CheckResult(NamedTuple):
 def _make_client(
     status_bar: StatusBarAPI | None = None,
     app_start_time: float = 0.0,
+    app_start_wall: float = 0.0,
 ) -> CreationsClient:
     return CreationsClient(ClientConfig(
         cache_path=_CACHE_FILE,
         session_start_time=app_start_time,
+        session_start_wall=app_start_wall,
         progress_callback=status_bar.set_task if status_bar else None,
     ))
 
@@ -40,10 +42,11 @@ def check_for_updates(
     creations: list[Creation],
     status_bar: StatusBarAPI,
     app_start_time: float = 0.0,
+    app_start_wall: float = 0.0,
 ) -> CheckResult:
     """Check for updates and return a new list with update info populated."""
     try:
-        client = _make_client(status_bar, app_start_time)
+        client = _make_client(status_bar, app_start_time, app_start_wall)
         latest = client.fetch_info(_to_queries(creations))
     except Exception:
         return CheckResult([deepcopy(c) for c in creations], 0)
@@ -67,10 +70,11 @@ def check_achievements(
     creations: list[Creation],
     status_bar: StatusBarAPI,
     app_start_time: float = 0.0,
+    app_start_wall: float = 0.0,
 ) -> CheckResult:
     """Check achievement friendliness for all creations."""
     try:
-        client = _make_client(status_bar, app_start_time)
+        client = _make_client(status_bar, app_start_time, app_start_wall)
         info_map = client.fetch_info(_to_queries(creations))
     except Exception:
         return CheckResult([deepcopy(c) for c in creations], 0)
@@ -89,13 +93,28 @@ def check_achievements(
     return CheckResult(result, skipped)
 
 
-def get_cached_info(app_start_time: float = 0.0) -> dict[str, CreationInfo]:
-    """Return all cached creation info within the session window."""
+def get_cached_info(
+    app_start_time: float = 0.0,
+    app_start_wall: float = 0.0,
+) -> dict[str, CreationInfo]:
+    """Return cached creation info that was fetched during the current session.
+
+    An entry is considered "fresh" only if:
+    - The session window hasn't expired (< 30 min since session start), AND
+    - The entry's fetched_at is after the session start (i.e., it was fetched
+      in this session, not left over from a previous one).
+    """
     from bethesda_creations._cache import load_cache, is_session_fresh, entry_to_info
     cache = load_cache(_CACHE_FILE)
     if not cache or not is_session_fresh(app_start_time, 1800):
         return {}
-    return {cid: entry_to_info(entry) for cid, entry in cache.items()}
+    # Per-entry session freshness: only return entries fetched in this session
+    results = {}
+    for cid, entry in cache.items():
+        fetched_at = entry.get("fetched_at", 0) or 0
+        if fetched_at >= app_start_wall:
+            results[cid] = entry_to_info(entry)
+    return results
 
 
 def get_cached_info_any() -> dict[str, CreationInfo]:
