@@ -1,6 +1,6 @@
 title: Starfield Toolkit
 description: User manual and architecture reference for the Starfield Toolkit.
-github_repo: https://github.com/MightyOwl4/starfield-tool
+github_repo: https://github.com/MightyOwl4/starfield-toolkit
 
 # Hardcoded docs revision — shown in the sidenav footer. Bump on meaningful
 # rewrites; no need to touch for typo-level fixes. Independent of the app's
@@ -17,8 +17,10 @@ hero:
         - { label: "Get started",       href: "/manual/installation.html" }
         - { label: "How Auto-Sort works", href: "/concepts/autosort-overview.html", ghost: true }
 
-# GitHub Pages serves project sites under /<repo>/. For local preview at the root, override with --baseurl ''.
-baseurl: "/starfield-tool"
+# GitHub Pages serves project sites at https://<user>.github.io/<repo>/, so
+# baseurl must match the repo name exactly. Local preview in docker-compose
+# overrides this to empty via --baseurl= for serving at http://localhost:4000/.
+baseurl: "/starfield-toolkit"
 
 # Use the github-pages gem set; no plugins beyond the defaults.
 plugins: []
