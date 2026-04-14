@@ -116,6 +116,37 @@ kbd, .kbd {
     font-weight: 600;
 }
 
+/* ---------- GitHub corner ribbon ---------- */
+
+/* Tim Holman's github-corners. The SVG's root `fill` paints the triangle;
+   paths with fill="currentColor" paint the octocat body, so `color` sets the
+   octocat's colour. On hover the triangle brightens and the octocat's arm waves. */
+.github-corner {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 20;
+}
+.github-corner:hover { text-decoration: none; }
+.github-corner svg {
+    display: block;
+    fill: var(--accent);       /* triangle */
+    color: #ffffff;            /* octocat body via currentColor */
+    transition: fill 0.2s ease;
+}
+.github-corner:hover svg { fill: var(--accent-dim); }
+.github-corner .octo-arm { transform-origin: 130px 106px; }
+.github-corner:hover .octo-arm { animation: octocat-wave 560ms ease-in-out; }
+@keyframes octocat-wave {
+    0%, 100% { transform: rotate(0); }
+    20%, 60% { transform: rotate(-25deg); }
+    40%, 80% { transform: rotate(10deg); }
+}
+@media (max-width: 500px) {
+    .github-corner svg { width: 60px; height: 60px; }
+    /* Mobile taps trigger :hover once, which plays the wave — acceptable. */
+}
+
 .content {
     padding: 2rem 2.5rem 4rem;
     max-width: calc(var(--col-reading) + 5rem);
