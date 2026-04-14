@@ -1,0 +1,70 @@
+---
+layout: default
+title: Fast Lane Check
+active: fast-lane-check
+h1: Fast Lane Check
+lede: Check whether your installed creations may have been affected by Bethesda's April 2026 Fast Lanes update. Answers one concrete question per creation.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Fast Lane Check" }
+---
+
+<h2>Getting started</h2>
+<p>The tab opens to an empty state with three import options:</p>
+<ul>
+    <li><strong>Import Installed creations</strong> — pulls the list directly from your current installation.</li>
+    <li><strong>Import from snapshot</strong> — load a previously saved load-order snapshot JSON.</li>
+    <li><strong>Import from CSV/TXT export</strong> — accepts a list previously exported from the Installed Creations tab (useful for checking someone else's library, or an old library state).</li>
+</ul>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-fast-lane.png' | relative_url }}" data-lightbox data-caption="Fast Lane Check — empty state">
+        <img src="{{ '/assets/img/screenshots/tab-fast-lane.png' | relative_url }}" alt="Fast Lane Check empty state"></a>
+    <figcaption>Empty state</figcaption>
+</figure>
+
+<h2>Running a check</h2>
+<p>
+    Once imported, each row has a <strong>Check</strong> button (<strong>Reset</strong> clears a row's result).
+    Clicking Check compares the creation's current remote version/hash against the bundled April-2026
+    baseline snapshot.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-fast-lane-check.png' | relative_url }}" data-lightbox data-caption="Fast Lane Check results">
+        <img src="{{ '/assets/img/screenshots/tab-fast-lane-check.png' | relative_url }}" alt="Fast Lane Check results"></a>
+    <figcaption>Results with mixed tiers</figcaption>
+</figure>
+
+<h2>Result tiers</h2>
+<table>
+    <tr><th>Tier</th><th>Meaning</th></tr>
+    <tr><td><span class="pill danger">Updated</span></td><td>Creation changed after the Fast Lanes baseline. Expect behavioral changes; revisit its description.</td></tr>
+    <tr><td><span class="pill warn">Likely updated</span></td><td>Version match is ambiguous; content hash differs.</td></tr>
+    <tr><td><span class="pill">Low risk</span></td><td>Creation updated, but its category (Weapons, Gear, Ships) is additive-only and unlikely to cause trouble.</td></tr>
+    <tr><td><span class="pill ok">Not updated</span></td><td>Identical to baseline.</td></tr>
+    <tr><td><span class="pill safe">Unaffected</span></td><td>Cosmetic-only category (Skins, Apparel, Body, Photo Mode, Audio). Fast Lanes changes do not apply.</td></tr>
+    <tr><td><span class="pill">Unknown</span></td><td>Not in the baseline snapshot, or API response was incomplete.</td></tr>
+</table>
+
+<p>Summary counters at the top of the tab show totals per tier; columns are sortable.</p>
+
+<h2>Category-based refinement</h2>
+<p>
+    The <em>Unaffected</em> and <em>Low risk</em> tiers exist because raw version/hash comparison produces
+    too many false-positives for cosmetic content. The refinement uses the creation's Bethesda API
+    category to short-circuit certain comparisons. See
+    <a href="{{ '/concepts/categories-tiers.html' | relative_url }}">Category tiers</a> for the full mapping.
+</p>
+
+<div class="callout">
+    <span class="label">Baseline date</span>
+    The bundled baseline is a point-in-time snapshot captured on <strong>April 2026</strong>, just before the
+    Fast Lanes update. It is updated with the toolkit; there is no live-fetch mode.
+</div>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 009 — Fast Lane Creation Check</li>
+    <li>Feature 011 — category-based classification refinement</li>
+</ul></div>

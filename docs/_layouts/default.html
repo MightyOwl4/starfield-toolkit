@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }} Docs</title>
+{% if page.description %}<meta name="description" content="{{ page.description }}">{% endif %}
+<link rel="icon" type="image/x-icon" href="{{ '/assets/icons/favicon.ico' | relative_url }}">
+<link rel="icon" type="image/png" href="{{ '/assets/icons/logo.png' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+{%- comment -%}
+    Site-level hero. Same content on every page — sourced from `site.hero` in _config.yml.
+    Page-specific titles/ledes are rendered in the content area below.
+{%- endcomment -%}
+<section class="hero">
+    <img class="hero-logo" src="{{ '/assets/icons/logo.png' | relative_url }}" alt="Starfield Toolkit logo">
+    <div class="hero-body">
+        <h1>{{ site.hero.title }}</h1>
+        {% if site.hero.tagline %}<p class="tagline">{{ site.hero.tagline }}</p>{% endif %}
+        {% if site.hero.cta %}
+        <div class="cta">
+            {% for btn in site.hero.cta %}
+                <a class="btn{% if btn.ghost %} ghost{% endif %}" href="{{ btn.href | relative_url }}">{{ btn.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+<div class="layout">
+    {% include sidenav.html %}
+    <main class="content{% if page.wide %} wide{% endif %}">
+        {% if page.crumbs %}
+        <nav class="crumbs">
+            {% for c in page.crumbs %}{% unless forloop.first %} <span class="sep">›</span> {% endunless %}{% if c.href %}<a href="{{ c.href | relative_url }}">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}{% endfor %}
+        </nav>
+        {% endif %}
+        {% if page.h1 %}<h1 class="page-title">{{ page.h1 }}</h1>{% endif %}
+        {% if page.lede %}<p class="lede">{{ page.lede }}</p>{% endif %}
+        {{ content }}
+    </main>
+</div>
+<script src="{{ '/assets/js/lightbox.js' | relative_url }}" defer></script>
+</body>
+</html>

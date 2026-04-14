@@ -1,0 +1,66 @@
+---
+layout: default
+title: Category tiers
+active: categories-tiers
+h1: Category tiers
+lede: The 11-tier community system, mapped from the Bethesda Creations category taxonomy. The always-available baseline sorter — and the input to Fast Lane classification.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "Category tiers" }
+---
+
+<h2>The 11 tiers</h2>
+<table>
+    <tr><th>Tier</th><th>Role</th><th>Typical content</th></tr>
+    <tr><td>1</td><td>Master files</td><td>ESMs that other content depends on</td></tr>
+    <tr><td>2</td><td>Game menu / launch / framework</td><td>Menu overhauls, SFSE-style frameworks</td></tr>
+    <tr><td>3</td><td>Invasive world edits</td><td>Large overhauls that touch many cells</td></tr>
+    <tr><td>4</td><td>Major systems</td><td>Economy, needs, faction overhauls</td></tr>
+    <tr><td>5</td><td>Gameplay tweaks</td><td>Combat, stealth, damage balance</td></tr>
+    <tr><td>6</td><td>Quests &amp; content</td><td>New quests, locations, ships</td></tr>
+    <tr><td>7</td><td>Items &amp; gear</td><td>Weapons, apparel, ship parts</td></tr>
+    <tr><td>8</td><td>Characters &amp; NPCs</td><td>Companions, NPC overhauls</td></tr>
+    <tr><td>9</td><td>Visual &amp; audio</td><td>Textures, shaders, soundtrack</td></tr>
+    <tr><td>10</td><td>UI &amp; HUD</td><td>Menu skins, HUD tweaks</td></tr>
+    <tr><td>11</td><td>Non-invasive world edits</td><td>Small cell additions, prop placements</td></tr>
+</table>
+
+<h2>Mapping from API categories</h2>
+<p>
+    Bethesda Creations exposes a flat list of categories per creation (<em>Weapons</em>, <em>Apparel</em>,
+    <em>Audio</em>, <em>Quests</em>, and so on). The Category sorter has a lookup table that maps
+    every known API category to a tier.
+</p>
+<p>
+    For each creation it emits a <code>tier(X, N)</code> soft constraint at priority 10. "Soft" means
+    a matching-priority <code>load_after</code> can override it — but in practice nothing else emits
+    at priority 10, so the tier effectively holds unless TES4, rule books, or LOOT say otherwise.
+</p>
+
+<h2>SAFE vs LOW_RISK refinement (for Fast Lane)</h2>
+<p>
+    The same category data feeds the <a href="{{ '/concepts/fast-lane-baseline.html' | relative_url }}">Fast Lane check</a>. There,
+    categories are partitioned into three buckets:
+</p>
+<ul>
+    <li>
+        <strong>SAFE</strong> — Skins, Apparel, Body, Photo Mode, Audio.
+        Purely cosmetic. A version change in a SAFE-category creation cannot trigger Fast Lane
+        incompatibility. Marked <span class="pill safe">Unaffected</span>.
+    </li>
+    <li>
+        <strong>LOW_RISK</strong> — Weapons, Gear, Ships.
+        Additive content that almost never alters shared systems. Marked
+        <span class="pill">Low risk</span> even when the version differs from baseline.
+    </li>
+    <li>
+        <strong>Default</strong> — everything else. Subject to full version/hash comparison against the
+        baseline.
+    </li>
+</ul>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 003 — Category sorter</li>
+    <li>Feature 011 — Fast Lane category refinement</li>
+</ul></div>

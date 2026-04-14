@@ -1,0 +1,23 @@
+---
+layout: default
+title: Concepts
+active: concepts
+h1: Concepts
+lede: Short articles explaining how the toolkit works under the hood — the auto-sort pipeline, what a rule book is, why the caching is the shape it is. Read these if a feature surprises you and you want to understand the logic, or if you're contributing to the codebase.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts" }
+---
+
+<div class="card-grid">
+    <div class="card"><a class="block-link" href="{{ '/concepts/autosort-overview.html'    | relative_url }}"><h3>Auto-Sort overview →</h3><p>End-to-end: from pressing the button to writing <code>Plugins.txt</code>.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/sorter-priority.html'      | relative_url }}"><h3>Sorter priority →</h3><p>TES4 &gt; Rule Books &gt; LOOT &gt; Categories, and why.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/tes4-masters.html'         | relative_url }}"><h3>TES4 masters →</h3><p>Parsing plugin headers and what a MAST subrecord means.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/loot-masterlist.html'      | relative_url }}"><h3>LOOT masterlist →</h3><p>Fetching the community YAML and its group model.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/categories-tiers.html'     | relative_url }}"><h3>Category tiers →</h3><p>The 11-tier community system, refined for Fast Lane checks.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/rulebooks.html'            | relative_url }}"><h3>Rule books →</h3><p>File format, precedence, curated vs user, how they round-trip through the editor.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/constraints-solver.html'   | relative_url }}"><h3>Constraints solver →</h3><p>Merging constraints from multiple sorters and topologically sorting the graph.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/caching.html'              | relative_url }}"><h3>API caching →</h3><p>Immutable vs volatile fields, staleness windows, disk layout.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/description-parser.html'   | relative_url }}"><h3>Description parser →</h3><p>Using an LLM to extract load-order hints from creation descriptions.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/concepts/fast-lane-baseline.html'   | relative_url }}"><h3>Fast Lane baseline →</h3><p>How the April-2026 snapshot is built and used.</p></a></div>
+</div>

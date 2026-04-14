@@ -1,0 +1,60 @@
+---
+layout: default
+title: Description parser
+active: description-parser
+h1: Description parser
+lede: An offline LLM pipeline that reads creation descriptions and turns their load-order hints into rule books.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "Description parser" }
+---
+
+<h2>The problem</h2>
+<p>
+    Creation authors routinely write things like <em>"Load this after &lt;X&gt;"</em> or <em>"Requires
+    &lt;Y&gt;"</em> in their description. This information is invisible to LOOT and to the Categories
+    sorter. Encoding it by hand into rule books would be a huge amount of manual work for ~5K
+    creations.
+</p>
+
+<h2>The pipeline</h2>
+<div class="pipeline">
+    <div class="stage"><span class="num">1</span><h4>Text catalogue</h4><p>Pre-scraped descriptions + release notes (Feature 005).</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">2</span><h4>LLM extraction</h4><p>Claude (Anthropic API) reads each description and emits structured load-order hints.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">3</span><h4>Filename resolution</h4><p>Hinted creation names are mapped to actual plugin filenames.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">4</span><h4>Rule book emission</h4><p>One curated rule book per batch, shipped with the toolkit.</p></div>
+</div>
+
+<h2>Why offline and why LLM</h2>
+<p>
+    The parser runs <em>offline</em>, in the project — not at runtime in the user's toolkit. Its
+    output is a set of JSON rule books that ship with the release. End users never hit an LLM API.
+</p>
+<p>
+    Why LLM: description prose is full of noise, typos, creation names that look nothing like their
+    plugin filenames, and relational phrasing ("install this first, but after the base mod") that
+    naive regex approaches fail on. An LLM is the cheapest tool that handles this robustly.
+</p>
+
+<h2>Output confidence</h2>
+<p>
+    The LLM is asked to emit a confidence level with each hint. High-confidence hints become rule
+    book entries; low-confidence hints are logged for manual review and never ship as rules. This
+    keeps the false-positive rate low — a bad rule would actively mis-sort users' load orders.
+</p>
+
+<h2>Relationship to rule books</h2>
+<p>
+    The output is a <em>curated</em> rule book (see <a href="{{ '/concepts/rulebooks.html' | relative_url }}">Rule books</a>). It sits
+    at the same priority as any other curated book, and is overridable by any user rule book. If the
+    parser gets something wrong, users can fix it locally without waiting for a release.
+</p>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 005 — Creations text catalogue</li>
+    <li>Feature 008 — Description dependency parser</li>
+</ul></div>

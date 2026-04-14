@@ -1,0 +1,44 @@
+---
+layout: default
+title: User Manual
+active: manual
+h1: User Manual
+lede: The manual walks through the toolkit tab by tab, in the order you'll encounter them. Each page is a self-contained reference — you can jump in anywhere.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual" }
+---
+
+<h2>Where to start</h2>
+<div class="card-grid">
+    <div class="card"><a class="block-link" href="{{ '/manual/installation.html'        | relative_url }}"><h3>Installation &amp; first run →</h3><p>Download, unpack, point the tool at Starfield, and understand the status bar.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/manual/installed-creations.html' | relative_url }}"><h3>Installed Creations →</h3><p>Browse what's installed, switch grid modes, check for updates and achievement safety.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/manual/load-order.html'          | relative_url }}"><h3>Load Order →</h3><p>Manual drag-and-drop and Auto-Sort, with snapshots and safety guards.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/manual/load-order-diff.html'     | relative_url }}"><h3>Diff dialog →</h3><p>Review Auto-Sort's proposal with visual connectors and per-item approve/ignore.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/manual/rule-books.html'          | relative_url }}"><h3>Rule Books →</h3><p>Enable, disable, reorder, and author load-order rules.</p></a></div>
+    <div class="card"><a class="block-link" href="{{ '/manual/fast-lane-check.html'     | relative_url }}"><h3>Fast Lane Check →</h3><p>See which creations may have been affected by the April 2026 Fast Lanes update.</p></a></div>
+</div>
+
+<h2>The main window</h2>
+<p>
+    The window is a tabbed shell. Each tab is an independent tool; nothing one tab does affects another
+    unless they share the same underlying game files. A persistent <strong>status bar</strong> runs along
+    the bottom, with two segments:
+</p>
+<ul>
+    <li><strong>Left</strong> — the configured Starfield install path, or a warning if none is set yet.</li>
+    <li><strong>Right</strong> — the current task description (for example, <em>Reading ESM list…</em>, <em>Checking for updates…</em>).</li>
+</ul>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/installed-creations-rich-media.png' | relative_url }}" data-lightbox data-caption="Main window — tabs, content area, and status bar">
+        <img src="{{ '/assets/img/screenshots/installed-creations-rich-media.png' | relative_url }}" alt="Main window — tabs, content area, and status bar">
+    </a>
+    <figcaption>Main window — tabs, content area, and status bar</figcaption>
+</figure>
+
+<div class="callout tip">
+    <span class="label">Tip</span>
+    The tool tolerates being closed and reopened mid-task. Nothing is written to disk until you
+    explicitly confirm (Apply in the diff dialog, Save Snapshot, etc.).
+</div>

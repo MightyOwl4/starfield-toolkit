@@ -1,0 +1,26 @@
+services:
+    docs:
+        build: .
+        container_name: starfield-toolkit-docs
+        ports:
+            - "4000:4000"    # Jekyll site
+            - "35729:35729"  # LiveReload websocket
+        volumes:
+            # Live-mount the site source so edits rebuild without rebuilding the image.
+            - .:/site
+            # Keep the bundle cache in a named volume so `bundle install` doesn't rerun
+            # every container start.
+            - bundle-cache:/usr/local/bundle
+        command:
+            - bundle
+            - exec
+            - jekyll
+            - serve
+            - --host=0.0.0.0
+            - --livereload
+            - --force_polling
+            - --incremental
+            - --baseurl=
+
+volumes:
+    bundle-cache:

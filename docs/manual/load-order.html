@@ -1,0 +1,90 @@
+---
+layout: default
+title: Load Order tab
+active: load-order
+h1: Load Order tab
+lede: Rearrange creations by hand, or let Auto-Sort propose an order for you. Nothing is written until you confirm.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Load Order" }
+---
+
+<h2>The list</h2>
+<p>
+    Each row is a creation (or a <em>group</em> when one creation ships multiple plugin files — the
+    group is locked together and moves as a unit). The numeric prefix is the current read index.
+    Row colour reflects state:
+</p>
+<ul>
+    <li><strong>Default</strong> — matches what's on disk in <code>Plugins.txt</code>.</li>
+    <li><strong>Highlighted (dirty)</strong> — the row has been moved since the list was loaded.</li>
+    <li><strong>Error (red)</strong> — the plugin file is missing or the row fails TES4 validation.</li>
+</ul>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-load-order.png' | relative_url }}" data-lightbox data-caption="Load Order tab">
+        <img src="{{ '/assets/img/screenshots/tab-load-order.png' | relative_url }}" alt="Load Order tab"></a>
+    <figcaption>Load Order tab</figcaption>
+</figure>
+
+<h2>Manual reordering</h2>
+<p>
+    Click-and-drag a row up or down. The <strong>dirty-state pattern</strong> means you can move
+    rows freely; nothing commits until you hit <em>Apply</em> (or <em>Revert</em> to discard all
+    pending moves). You can also use the keyboard: arrow keys select, <kbd>Alt</kbd>+<kbd>↑</kbd>/
+    <kbd>↓</kbd> moves.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-load-order-dirty.png' | relative_url }}" data-lightbox data-caption="Dirty row after reordering">
+        <img src="{{ '/assets/img/screenshots/tab-load-order-dirty.png' | relative_url }}" alt="Dirty row after reordering"></a>
+    <figcaption>Moved row highlighted while changes are pending</figcaption>
+</figure>
+
+<h2>Auto-Sort</h2>
+<p>
+    The <strong>Auto Sort</strong> button runs the full sorter pipeline. All sorters run; their
+    constraints are merged by priority (higher wins):
+</p>
+<div class="pipeline">
+    <div class="stage"><h4>TES4 masters <span class="priority-badge">100</span></h4><p>Hard constraints from plugin headers. Non-bypassable.</p></div>
+    <div class="stage"><h4>Rule Books <span class="priority-badge">30–40+</span></h4><p>Curated and user-authored overrides.</p></div>
+    <div class="stage"><h4>LOOT <span class="priority-badge">20</span></h4><p>Community masterlist groups and rules.</p></div>
+    <div class="stage"><h4>Categories <span class="priority-badge">10</span></h4><p>11-tier baseline from API categories.</p></div>
+</div>
+<p>
+    When Auto-Sort completes, the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a> opens so you can review
+    the proposal before anything changes.
+</p>
+<p>See <a href="{{ '/concepts/autosort-overview.html' | relative_url }}">How Auto-Sort works</a> and <a href="{{ '/concepts/sorter-priority.html' | relative_url }}">Sorter priority</a> for the mechanics.</p>
+
+<h2>Snapshots</h2>
+<p>
+    <strong>Save Snapshot</strong> writes the current load order to a timestamped JSON file.
+    <strong>Load Snapshot</strong> restores one — useful for A/B-testing orderings or rolling back
+    after an experiment.
+</p>
+
+<h2>Safety guards</h2>
+<div class="callout warn">
+    <span class="label">Protected state</span>
+    The tool detects a running Starfield process and blocks all writes while the game is up —
+    the catalogue and plugins file are re-read by the game at launch only, so mid-session edits
+    can desync.
+</div>
+<ul>
+    <li><strong>Multi-file groups</strong> — creations with multiple <code>.esm</code>/<code>.esp</code> files move as one unit.</li>
+    <li><strong>TES4 validation on Apply</strong> — any proposal that violates a master dependency is refused outright (see <a href="{{ '/concepts/tes4-masters.html' | relative_url }}">TES4 masters</a>).</li>
+    <li><strong>Atomic write</strong> — <code>Plugins.txt</code> is written to a temp file and renamed, so a power loss can't leave it half-written.</li>
+</ul>
+
+<div class="spec-refs">
+    <h4>Internal references</h4>
+    <ul>
+        <li>Feature 003 — load order sorting tool</li>
+        <li>Feature 006 — TES4 master dependency sorting</li>
+        <li>Feature 007 — rule books</li>
+        <li>Feature 010 — diff dialog connectors &amp; hints</li>
+    </ul>
+</div>

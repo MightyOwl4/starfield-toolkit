@@ -1,0 +1,8 @@
+source "https://rubygems.org"
+
+# Pin to the same Jekyll + plugins that GitHub Pages runs, so local preview
+# matches production. https://pages.github.com/versions/
+gem "github-pages", group: :jekyll_plugins
+
+# LiveReload for --livereload serving.
+gem "webrick"

@@ -1,0 +1,115 @@
+---
+layout: default
+title: Welcome
+active: welcome
+description: User manual and architecture reference for the Starfield Toolkit — a Windows GUI for managing Bethesda Creations load order.
+wide: true
+---
+
+<div class="callout warn">
+    <span class="label">Disclaimer</span>
+    Starfield Toolkit is an unofficial, community-built tool. It is <strong>not affiliated with,
+    endorsed by, or sponsored by Bethesda Softworks, ZeniMax Media, or Microsoft</strong>.
+    "Starfield" and "Bethesda" are trademarks of their respective owners; all game assets,
+    creation metadata, and API endpoints remain the property of those rights holders. This
+    project simply provides a convenience UI over publicly accessible information.
+</div>
+
+<div class="callout">
+    <span class="label">Scope</span>
+    This tool is built for a narrow configuration and only supports:
+    <ul>
+        <li><strong>Windows</strong> (10 or 11, 64-bit). No Linux or macOS.</li>
+        <li><strong>Starfield installed via Steam</strong>. Game Pass / Xbox app installs are not supported.</li>
+        <li><strong>Bethesda Creations only</strong>. If you use Nexus Mods with a mod manager like
+            Vortex or MO2, those tools already handle load order, update checks, and more — this
+            project is not intended to replace them.</li>
+    </ul>
+</div>
+
+<h2>What is this?</h2>
+<p>
+    Starfield Toolkit is a small, focused companion app for players who run
+    <strong>Bethesda Creations</strong> — the official in-game mod store. It reads your installed
+    creations, talks to the Bethesda Creations API, and helps you keep your load order sane without
+    editing any game files by hand.
+</p>
+<p>
+    The tool never writes to your <code>Data/</code> folder. It only touches metadata files
+    (<code>Plugins.txt</code>, <code>ContentCatalog.txt</code>) and its own cache — the same files
+    the game itself rewrites at startup.
+</p>
+
+<h2>At a glance</h2>
+<div class="gallery">
+    <figure class="shot">
+        <a href="{{ '/assets/img/screenshots/tab-installed-creations.png' | relative_url }}" data-lightbox data-caption="Installed Creations tab">
+            <img src="{{ '/assets/img/screenshots/tab-installed-creations.png' | relative_url }}" alt="Installed Creations tab" loading="lazy">
+        </a>
+        <figcaption>Installed Creations</figcaption>
+    </figure>
+    <figure class="shot">
+        <a href="{{ '/assets/img/screenshots/tab-load-order.png' | relative_url }}" data-lightbox data-caption="Load Order tab">
+            <img src="{{ '/assets/img/screenshots/tab-load-order.png' | relative_url }}" alt="Load Order tab" loading="lazy">
+        </a>
+        <figcaption>Load Order</figcaption>
+    </figure>
+    <figure class="shot">
+        <a href="{{ '/assets/img/screenshots/diff-dialog.png' | relative_url }}" data-lightbox data-caption="Auto-Sort diff dialog">
+            <img src="{{ '/assets/img/screenshots/diff-dialog.png' | relative_url }}" alt="Auto-Sort diff dialog" loading="lazy">
+        </a>
+        <figcaption>Auto-Sort review</figcaption>
+    </figure>
+    <figure class="shot">
+        <a href="{{ '/assets/img/screenshots/tab-rule-books.png' | relative_url }}" data-lightbox data-caption="Rule book editor">
+            <img src="{{ '/assets/img/screenshots/tab-rule-books.png' | relative_url }}" alt="Rule book editor" loading="lazy">
+        </a>
+        <figcaption>Rule book editor</figcaption>
+    </figure>
+    <figure class="shot">
+        <a href="{{ '/assets/img/screenshots/tab-fast-lane.png' | relative_url }}" data-lightbox data-caption="Fast Lane Check">
+            <img src="{{ '/assets/img/screenshots/tab-fast-lane.png' | relative_url }}" alt="Fast Lane Check" loading="lazy">
+        </a>
+        <figcaption>Fast Lane Check</figcaption>
+    </figure>
+</div>
+
+<h2>Where to start</h2>
+<div class="card-grid">
+    <div class="card">
+        <a class="block-link" href="{{ '/manual/installation.html' | relative_url }}">
+            <h3>Install &amp; first run →</h3>
+            <p>Download the binary, point it at your Starfield install, read the status bar.</p>
+        </a>
+    </div>
+    <div class="card">
+        <a class="block-link" href="{{ '/manual/load-order.html' | relative_url }}">
+            <h3>Sort your load order →</h3>
+            <p>Drag to reorder, or hit Auto-Sort and review the diff before applying.</p>
+        </a>
+    </div>
+    <div class="card">
+        <a class="block-link" href="{{ '/concepts/autosort-overview.html' | relative_url }}">
+            <h3>Understand Auto-Sort →</h3>
+            <p>The priority pipeline, what a rule book is, why your order looks the way it does.</p>
+        </a>
+    </div>
+    <div class="card">
+        <a class="block-link" href="{{ '/manual/fast-lane-check.html' | relative_url }}">
+            <h3>Check Fast Lane impact →</h3>
+            <p>See which of your creations may have been affected by the April 2026 update.</p>
+        </a>
+    </div>
+</div>
+
+<h2>Scope &amp; limitations</h2>
+<ul>
+    <li><strong>Windows only.</strong> Starfield on Steam. No Linux/macOS plans.</li>
+    <li><strong>Bethesda Creations only.</strong> No Nexus or manually-installed mods.</li>
+    <li><strong>Read-mostly.</strong> The tool edits load order metadata and its own cache; it does not patch game assets.</li>
+</ul>
+
+<p style="margin-top:2rem; color:var(--fg-dim); font-size:0.88em;">
+    Documentation is hand-authored. For the formal feature specifications the tool was built from,
+    see the <code>specs/</code> directory in the repository.
+</p>

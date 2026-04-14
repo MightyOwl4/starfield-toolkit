@@ -1,0 +1,73 @@
+---
+layout: default
+title: Auto-Sort overview
+active: autosort-overview
+h1: Auto-Sort overview
+lede: What happens between clicking Auto Sort and reviewing the diff.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "Auto-Sort overview" }
+---
+
+<h2>The pipeline</h2>
+<p>Auto-Sort is a constraint-solver pipeline. Each stage contributes constraints; a final pass merges them by priority and topologically sorts the result.</p>
+
+<div class="pipeline">
+    <div class="stage"><span class="num">1</span><h4>Gather creations</h4><p>Read <code>Plugins.txt</code> and <code>ContentCatalog.txt</code>. Group multi-file creations.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">2</span><h4>Run each sorter</h4><p>TES4, LOOT, Categories, Rule Books — each emits its own constraint set.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">3</span><h4>Merge by priority</h4><p>Highest-priority sorter wins on conflict. See <a href="{{ '/concepts/sorter-priority.html' | relative_url }}">Sorter priority</a>.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">4</span><h4>Topological sort</h4><p>Produce a total ordering consistent with the merged constraints.</p></div>
+    <div class="arrow">→</div>
+    <div class="stage"><span class="num">5</span><h4>Diff &amp; review</h4><p>Open the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>. No writes yet.</p></div>
+</div>
+
+<h2>Stage 1 — gather creations</h2>
+<p>
+    The tool reads the game's metadata files into a list of <em>creation info</em> records. Multi-file
+    creations (one creation that ships, say, an <code>.esm</code> and a patch <code>.esp</code>) are
+    grouped so they always move together — the game can break if they're split.
+</p>
+
+<h2>Stage 2 — run each sorter</h2>
+<p>Four sorters run in parallel. Each produces a bag of <em>sort constraints</em>. The constraint vocabulary is small:</p>
+<ul>
+    <li><code>load_after(A, B)</code> — A must load after B.</li>
+    <li><code>load_before(A, B)</code> — normalized to <code>load_after(B, A)</code>.</li>
+    <li><code>tier(X, N)</code> — X belongs in the Nth tier (a soft constraint — overridable by a hard <code>load_after</code>).</li>
+</ul>
+<p>Every constraint carries a <em>source</em> (which sorter produced it) and a <em>priority</em>.</p>
+
+<h2>Stage 3 — merge</h2>
+<p>
+    When two sorters disagree (one says A-before-B, another says B-before-A; or two rule books give
+    different tiers), the constraint with the higher priority wins. The loser is retained in a
+    <em>rejected</em> list — this is what the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Hint dialog</a>
+    shows.
+</p>
+
+<h2>Stage 4 — solve</h2>
+<p>
+    The merged constraint set forms a directed graph. A stable topological sort turns it into a
+    linear order, breaking ties by original read order (so unaffected creations don't jump around).
+    See <a href="{{ '/concepts/constraints-solver.html' | relative_url }}">Constraints solver</a> for the gory details, including
+    cycle detection.
+</p>
+
+<h2>Stage 5 — diff</h2>
+<p>
+    The proposal is presented to you. The tool does <strong>not</strong> write <code>Plugins.txt</code>
+    until you Apply. On Apply, a final <a href="{{ '/concepts/tes4-masters.html' | relative_url }}">TES4 validation</a> pass ensures
+    the ordering respects master dependencies; if it doesn't, the write is refused.
+</p>
+
+<h2>Design properties</h2>
+<ul>
+    <li><strong>Additive.</strong> New sorters can be added without touching the others — they just emit constraints.</li>
+    <li><strong>Explainable.</strong> Every move in the diff can point at the specific constraint that caused it.</li>
+    <li><strong>Reviewable.</strong> Nothing is written until you look at it.</li>
+    <li><strong>Safe.</strong> TES4 is a hard gate; the tool refuses to produce game-breaking orderings.</li>
+</ul>

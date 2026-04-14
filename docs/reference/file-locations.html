@@ -1,0 +1,62 @@
+---
+layout: default
+title: File locations
+active: file-locations
+h1: File locations
+lede: Where the toolkit reads from, and where it writes to. Paths use typical Windows conventions; substitute your own username.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Reference", href: "/reference/" }
+    - { label: "File locations" }
+---
+
+<h2>Game files the tool reads</h2>
+<p>
+    Starfield's own files live under <strong><code>%LOCALAPPDATA%\Starfield\</code></strong>
+    (i.e. <code>C:\Users\&lt;you&gt;\AppData\Local\Starfield\</code>). Bethesda writes these; the
+    toolkit only touches <code>Plugins.txt</code>.
+</p>
+<table>
+    <tr><th>File</th><th>Path</th><th>Access</th></tr>
+    <tr><td><code>Plugins.txt</code></td><td><code>%LOCALAPPDATA%\Starfield\Plugins.txt</code></td><td>Read + write (on Apply only)</td></tr>
+    <tr><td><code>ContentCatalog.txt</code></td><td><code>%LOCALAPPDATA%\Starfield\ContentCatalog.txt</code></td><td>Read only</td></tr>
+    <tr><td>Plugin files</td><td><code>&lt;Steam&gt;\steamapps\common\Starfield\Data\*.esm</code>, <code>*.esp</code></td><td>Read only (TES4 header only)</td></tr>
+</table>
+
+<div class="callout warn">
+    <span class="label">Important</span>
+    <code>Plugins.txt</code> is the <em>only</em> game file the toolkit writes to, and only when you
+    explicitly Apply a load-order change. Plugin files themselves are never modified.
+</div>
+
+<h2>Toolkit data directory</h2>
+<p>
+    The toolkit stores its own data under <strong><code>%APPDATA%\StarfieldToolkit\</code></strong>
+    (Roaming — i.e. <code>C:\Users\&lt;you&gt;\AppData\Roaming\StarfieldToolkit\</code>). Paste
+    <code>%APPDATA%\StarfieldToolkit</code> into Explorer's address bar to jump there.
+</p>
+<table>
+    <tr><th>Path</th><th>Contents</th></tr>
+    <tr><td><code>config.json</code></td><td>App preferences (game path, window layout, rule-book registry, etc.).</td></tr>
+    <tr><td><code>creations_catalogue.json</code></td><td>Offline creations catalogue (populated by the scraper tool; used by the description parser and Fast Lane baseline).</td></tr>
+    <tr><td><code>images\</code></td><td>Cached creation thumbnails.</td></tr>
+    <tr><td><code>rules\</code></td><td>Your user-authored rule books (JSON, one per file).</td></tr>
+</table>
+<p>
+    No log files, cache subtrees, or snapshot directory are created automatically. Load-order
+    snapshots are saved only to the path you pick in the Save-Snapshot file dialog.
+</p>
+
+<h2>Bundled with the binary</h2>
+<p>Read-only, packed inside <code>StarfieldToolkit.exe</code> (extracted to a temp dir at launch via PyInstaller):</p>
+<ul>
+    <li><code>data\rules\</code> — curated rule books shipped with the release.</li>
+    <li>Fast Lane baseline snapshot, bundled LOOT masterlist fallback, etc.</li>
+</ul>
+
+<h2>Clearing state</h2>
+<ul>
+    <li><em>Clear Cache</em> in Installed Creations drops cached API responses and thumbnails under <code>images\</code>.</li>
+    <li>Deleting the whole <code>%APPDATA%\StarfieldToolkit\</code> directory is safe — the tool rebuilds everything on next launch (you will lose user rule books and the catalogue).</li>
+    <li>Your user rule books live in <code>rules\</code>; back up that folder if you want to keep them before wiping.</li>
+</ul>

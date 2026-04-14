@@ -1,0 +1,82 @@
+---
+layout: default
+title: Installed Creations tab
+active: installed-creations
+h1: Installed Creations tab
+lede: Your inventory of Bethesda Creations, in two display modes, with update and achievement checks.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Installed Creations" }
+---
+
+<h2>What you see</h2>
+<p>
+    The tab lists every creation the game considers installed, pulled from
+    <code>ContentCatalog.txt</code>. Read order reflects the current <code>Plugins.txt</code>.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-installed-creations.png' | relative_url }}" data-lightbox data-caption="Installed Creations tab — text list mode">
+        <img src="{{ '/assets/img/screenshots/tab-installed-creations.png' | relative_url }}" alt="Installed Creations tab — text list mode"></a>
+    <figcaption>Text list mode</figcaption>
+</figure>
+
+<h2>Display modes</h2>
+<p>Use the mode toggle at the top of the tab to switch between:</p>
+<ul>
+    <li><strong>Text list.</strong> Dense table with <em>Name</em>, <em>Author</em>, <em>Version</em>, and flags. Good for quickly scanning a large library.</li>
+    <li><strong>Rich media.</strong> Tile grid with thumbnails, author, description excerpt, and achievement icon. Good for browsing and recognising creations visually.</li>
+</ul>
+<p>The mode preference is remembered between sessions.</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/installed-creations-rich-media.png' | relative_url }}" data-lightbox data-caption="Installed Creations — rich media mode">
+        <img src="{{ '/assets/img/screenshots/installed-creations-rich-media.png' | relative_url }}" alt="Installed Creations — rich media mode"></a>
+    <figcaption>Rich media mode</figcaption>
+</figure>
+
+<h2>Controls</h2>
+<table>
+    <tr><th>Button</th><th>What it does</th></tr>
+    <tr><td>Check for Updates</td><td>Queries the Bethesda Creations API for each installed creation's latest version, highlights any that are outdated.</td></tr>
+    <tr><td>Check Achievements</td><td>Flags any creations that disable Steam achievements (per Bethesda's <em>achievement friendly</em> flag).</td></tr>
+    <tr><td>Export</td><td>Saves the current list to CSV or Markdown. Used as input to <a href="{{ '/manual/fast-lane-check.html' | relative_url }}">Fast Lane Check</a>.</td></tr>
+    <tr><td>Clear Cache</td><td>Wipes locally cached API responses. Useful if you suspect a stale cached price or version.</td></tr>
+    <tr><td>Details…</td><td>Opens the <a href="{{ '/manual/dialogs.html' | relative_url }}">Creation details dialog</a> with full metadata.</td></tr>
+</table>
+
+<div class="callout">
+    <span class="label">Note</span>
+    Update checks are rate-limited and cached. See <a href="{{ '/concepts/caching.html' | relative_url }}">API caching</a> for how long each field is trusted.
+</div>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/installed-creations-update-check.png' | relative_url }}" data-lightbox data-caption="Update check results">
+        <img src="{{ '/assets/img/screenshots/installed-creations-update-check.png' | relative_url }}" alt="Update check results"></a>
+    <figcaption>Update check results</figcaption>
+</figure>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/installed-creations-achievements-check.png' | relative_url }}" data-lightbox data-caption="Achievement check results">
+        <img src="{{ '/assets/img/screenshots/installed-creations-achievements-check.png' | relative_url }}" alt="Achievement check results"></a>
+    <figcaption>Achievement check results</figcaption>
+</figure>
+
+<h2>Creation details dialog</h2>
+<p>
+    Clicking a creation (or <em>Details…</em>) opens a modal with everything the tool knows:
+    title, author, full description, version, price, download size, categories, achievement flag,
+    first-seen and last-updated dates, and a thumbnail. All of it comes from the local cache —
+    nothing is re-fetched on open.
+</p>
+<p>See the <a href="{{ '/manual/dialogs.html' | relative_url }}">Dialogs reference</a> for the full field list.</p>
+
+<div class="spec-refs">
+    <h4>Internal references</h4>
+    <ul>
+        <li>Feature 001 — tabbed shell &amp; installed creations list</li>
+        <li>Feature 002 — API response caching</li>
+        <li>Feature 004 — grid modes &amp; details dialog</li>
+    </ul>
+</div>
