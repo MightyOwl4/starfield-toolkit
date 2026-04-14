@@ -1,0 +1,39 @@
+title: Starfield Toolkit
+description: User manual and architecture reference for the Starfield Toolkit.
+github_repo: https://github.com/MightyOwl4/starfield-tool
+
+# Hardcoded docs revision — shown in the sidenav footer. Bump on meaningful
+# rewrites; no need to touch for typo-level fixes. Independent of the app's
+# release version (tracked separately via git tags).
+docs_version: "0.9"
+docs_updated: "2026-04-14"
+
+# Site-wide hero shown on every page (same content on landing and sub-pages).
+# Per-page titles/ledes render in the content area via page.h1 / page.lede.
+hero:
+    title: Starfield Toolkit
+    tagline: A Windows GUI for managing Bethesda Creations — load order, updates, rule books, and Fast Lane compatibility, without ever touching your game files.
+    cta:
+        - { label: "Get started",       href: "/manual/installation.html" }
+        - { label: "How Auto-Sort works", href: "/concepts/autosort-overview.html", ghost: true }
+
+# GitHub Pages serves project sites under /<repo>/. For local preview at the root, override with --baseurl ''.
+baseurl: "/starfield-tool"
+
+# Use the github-pages gem set; no plugins beyond the defaults.
+plugins: []
+
+# Disable the default Minima theme — we ship handwritten CSS. Leaving Minima
+# active caused built assets/css/style.css to get overwritten with its
+# normalize.css compilation during incremental builds.
+theme: null
+
+exclude:
+    - README.md
+    - Gemfile
+    - Gemfile.lock
+    - Dockerfile
+    - docker-compose.yml
+    - vendor/
+    - .specify/
+    - ../specs/

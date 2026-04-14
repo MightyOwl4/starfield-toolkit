@@ -1,0 +1,78 @@
+---
+layout: default
+title: TES4 masters
+active: tes4-masters
+h1: TES4 masters
+lede: The highest-priority, non-bypassable sorter. Reads the binary plugin header and enforces master dependencies.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "TES4 masters" }
+---
+
+<h2>Background</h2>
+<p>
+    Every Bethesda plugin file (<code>.esm</code>, <code>.esp</code>) starts with a TES4 record — a
+    fixed header that identifies the plugin and lists its <em>masters</em>: plugins this one depends
+    on. Masters must load before their dependents. This is a rule of the game engine, not an
+    advisory convention.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tes4-header.png' | relative_url }}" data-lightbox data-caption="TES4 header structure">
+        <img src="{{ '/assets/img/screenshots/tes4-header.png' | relative_url }}" alt="Annotated TES4 header structure"></a>
+    <figcaption>TES4 header layout</figcaption>
+</figure>
+
+<h2>MAST subrecords</h2>
+<p>
+    Inside the TES4 record, each master is listed as a <code>MAST</code> subrecord containing the
+    master plugin's filename (followed by a <code>DATA</code> subrecord the toolkit ignores). The
+    parser walks only far enough into the file to extract these — it does not load any other
+    records, so the operation is fast even on large ESMs.
+</p>
+<p>Base-game masters are filtered out:</p>
+<ul>
+    <li><code>Starfield.esm</code></li>
+    <li><code>Constellation.esm</code></li>
+    <li><code>OldMars.esm</code></li>
+    <li><code>SFBGS*.esm</code> (Bethesda Game Studios DLC-style masters)</li>
+    <li><code>ShatteredSpace.esm</code></li>
+</ul>
+<p>
+    These are engine-guaranteed to load before any Creation, so emitting constraints about them
+    would just be noise.
+</p>
+
+<h2>Constraint emission</h2>
+<p>
+    For every non-base master, the sorter emits <code>load_after(dependent, master)</code> at
+    priority 100. The constraint is hard: it wins over every other source.
+</p>
+
+<h2>Validation on Apply</h2>
+<p>
+    Because you can reject moves individually in the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff
+    dialog</a>, the final ordering you submit may differ from what Auto-Sort proposed. Before writing
+    <code>Plugins.txt</code>, the tool re-runs the TES4 check on the accepted order. If any master
+    dependency is violated, the Apply is refused and the offending pair is highlighted. There is no
+    opt-out. The cost of a broken load order is much higher than the annoyance of re-approving.
+</p>
+
+<div class="callout warn">
+    <span class="label">Non-bypassable</span>
+    TES4 is the only check the tool never lets you skip — not in the diff, not via a hidden flag,
+    not with a rule book override. If you need to violate a master dependency you can still do it by
+    editing <code>Plugins.txt</code> yourself, but the toolkit won't help.
+</div>
+
+<h2>Parser notes</h2>
+<p>
+    The parser is strictly read-only and operates on a small prefix of the file. Corrupted headers
+    are reported but do not crash the sort — the affected creation is flagged and sorted by
+    Categories only. Compressed TES4 records (rare but legal) are decompressed in-memory.
+</p>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 006 — TES4 master dependency sorting</li>
+</ul></div>

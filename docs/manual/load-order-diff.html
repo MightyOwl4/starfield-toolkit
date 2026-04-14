@@ -1,0 +1,101 @@
+---
+layout: default
+title: Diff dialog
+active: load-order-diff
+h1: Diff dialog
+lede: Review what Auto-Sort wants to change, constraint by constraint, before anything touches Plugins.txt.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Diff dialog" }
+---
+
+<h2>Anatomy</h2>
+<p>The dialog is a side-by-side comparison:</p>
+<ul>
+    <li><strong>Left panel</strong> — your <em>current</em> load order.</li>
+    <li><strong>Right panel</strong> — Auto-Sort's <em>proposed</em> order.</li>
+    <li>
+        <strong>Coloured Bezier connectors</strong> — drawn between every item that moved,
+        linking its old position to its new one. Each connector has a coloured endpoint dot so
+        moves are easy to pick out at a glance.
+        <br>
+        <strong>Hover highlighting:</strong> mousing over a moved row in either panel bolds
+        both endpoints (the row in the other panel too) and its connector, so you can trace
+        where a single creation ended up even when many connectors cross.
+    </li>
+    <li><strong>Hint icons</strong> — next to every moved item. Click one to open the <a href="{{ '/manual/dialogs.html' | relative_url }}#hint">Hint dialog</a>, which lists <em>every</em> constraint considered for that item: winners, losers, the sorter that contributed each, and priority level.</li>
+    <li>
+        <strong>Per-item Apply / Ignore</strong> — accept or reject individual moves; you are
+        not forced to take the whole proposal. Two ways to mark moves as accepted:
+        <ul>
+            <li><strong>Click a row in the right-hand (proposed) panel</strong> to toggle
+                that single move between accepted and ignored. Accepted rows get a tinted
+                background.</li>
+            <li>Or hit the <strong>Apply All</strong> button to mark every move as accepted
+                in one go (you can still click individual rows afterwards to drop specific
+                ones).</li>
+        </ul>
+        Clicks on the info column (<span class="mono">ⓘ</span>) open the Hint dialog instead
+        of toggling — that column is a separate target.
+    </li>
+</ul>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/diff-dialog.png' | relative_url }}" data-lightbox data-caption="Diff dialog with connectors">
+        <img src="{{ '/assets/img/screenshots/diff-dialog.png' | relative_url }}" alt="Diff dialog with connectors"></a>
+    <figcaption>Diff dialog with connectors</figcaption>
+</figure>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/diff-dialog-highlighted.png' | relative_url }}" data-lightbox data-caption="Hover highlighting">
+        <img src="{{ '/assets/img/screenshots/diff-dialog-highlighted.png' | relative_url }}" alt="Hover highlight"></a>
+    <figcaption>Hovering a moved row bolds its pair and connector</figcaption>
+</figure>
+
+<h2>Sorter attribution labels</h2>
+<p>
+    Every moved item is tagged with which sorter's constraint was the deciding factor for its new
+    position. The pill colour matches the sorter:
+</p>
+<p>
+    <span class="pill accent">TES4</span>
+    <span class="pill ok">LOOT</span>
+    <span class="pill warn">Categories</span>
+    <span class="pill">Rule Book</span>
+</p>
+
+<h2>Hint dialog</h2>
+<p>
+    Clicking a hint icon lists <em>all</em> constraints that touched that item, not just the winning one.
+    This is the debugging view — use it when a placement surprises you and you want to know why.
+    Losing constraints are shown greyed out with the reason they were overridden.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/diff-hint-dialog.png' | relative_url }}" data-lightbox data-caption="Hint dialog">
+        <img src="{{ '/assets/img/screenshots/diff-hint-dialog.png' | relative_url }}" alt="Hint dialog"></a>
+    <figcaption>Hint dialog</figcaption>
+</figure>
+
+<h2>Applying</h2>
+<ul>
+    <li><strong>Apply all</strong> — write every accepted move to <code>Plugins.txt</code>.</li>
+    <li><strong>Apply selected</strong> — only those rows you explicitly marked <em>Apply</em>.</li>
+    <li><strong>Cancel</strong> — close the dialog without changing anything.</li>
+</ul>
+
+<div class="callout warn">
+    <span class="label">Validation</span>
+    On Apply, the final ordering is re-validated against TES4 masters. If your selection of
+    per-item accepts leaves the order in a state that violates a master dependency, the write is
+    blocked and the offending pair is highlighted.
+</div>
+
+<div class="spec-refs">
+    <h4>Internal references</h4>
+    <ul>
+        <li>Feature 003 — diff view &amp; per-item apply/ignore</li>
+        <li>Feature 010 — visual connectors &amp; hint dialog</li>
+    </ul>
+</div>

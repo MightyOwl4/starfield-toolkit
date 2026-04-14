@@ -1,0 +1,54 @@
+{%- comment -%}
+    Single source of truth for the side navigation.
+    Each page sets `active: <id>` in its front matter; the matching link gets the .current class.
+{%- endcomment -%}
+{%- assign a = page.active -%}
+<aside class="sidenav">
+    <ul class="sidenav-top">
+        <li><a href="{{ '/' | relative_url }}"{% if a == 'welcome' %} class="current"{% endif %}>Welcome</a></li>
+    </ul>
+    <h3>Manual</h3>
+    <ul>
+        <li><a href="{{ '/manual/'                          | relative_url }}"{% if a == 'manual'              %} class="current"{% endif %}>Overview</a></li>
+        <li><a href="{{ '/manual/installation.html'         | relative_url }}"{% if a == 'installation'        %} class="current"{% endif %}>Installation &amp; first run</a></li>
+        <li><a href="{{ '/manual/installed-creations.html'  | relative_url }}"{% if a == 'installed-creations' %} class="current"{% endif %}>Installed Creations tab</a></li>
+        <li><a href="{{ '/manual/load-order.html'           | relative_url }}"{% if a == 'load-order'          %} class="current"{% endif %}>Load Order tab</a></li>
+        <li><a href="{{ '/manual/load-order-diff.html'      | relative_url }}"{% if a == 'load-order-diff'     %} class="current"{% endif %}>Diff dialog</a></li>
+        <li><a href="{{ '/manual/rule-books.html'           | relative_url }}"{% if a == 'rule-books'          %} class="current"{% endif %}>Rule Books tab</a></li>
+        <li><a href="{{ '/manual/fast-lane-check.html'      | relative_url }}"{% if a == 'fast-lane-check'     %} class="current"{% endif %}>Fast Lane Check</a></li>
+        <li><a href="{{ '/manual/dialogs.html'              | relative_url }}"{% if a == 'dialogs'             %} class="current"{% endif %}>Dialogs reference</a></li>
+    </ul>
+    <h3>Concepts</h3>
+    <ul>
+        <li><a href="{{ '/concepts/'                            | relative_url }}"{% if a == 'concepts'            %} class="current"{% endif %}>Overview</a></li>
+        <li><a href="{{ '/concepts/autosort-overview.html'      | relative_url }}"{% if a == 'autosort-overview'   %} class="current"{% endif %}>Auto-Sort overview</a></li>
+        <li><a href="{{ '/concepts/sorter-priority.html'        | relative_url }}"{% if a == 'sorter-priority'     %} class="current"{% endif %}>Sorter priority</a></li>
+        <li><a href="{{ '/concepts/tes4-masters.html'           | relative_url }}"{% if a == 'tes4-masters'        %} class="current"{% endif %}>TES4 masters</a></li>
+        <li><a href="{{ '/concepts/loot-masterlist.html'        | relative_url }}"{% if a == 'loot-masterlist'     %} class="current"{% endif %}>LOOT masterlist</a></li>
+        <li><a href="{{ '/concepts/categories-tiers.html'       | relative_url }}"{% if a == 'categories-tiers'    %} class="current"{% endif %}>Category tiers</a></li>
+        <li><a href="{{ '/concepts/rulebooks.html'              | relative_url }}"{% if a == 'rulebooks'           %} class="current"{% endif %}>Rule books</a></li>
+        <li><a href="{{ '/concepts/constraints-solver.html'     | relative_url }}"{% if a == 'constraints-solver'  %} class="current"{% endif %}>Constraints solver</a></li>
+        <li><a href="{{ '/concepts/caching.html'                | relative_url }}"{% if a == 'caching'             %} class="current"{% endif %}>API caching</a></li>
+        <li><a href="{{ '/concepts/description-parser.html'     | relative_url }}"{% if a == 'description-parser'  %} class="current"{% endif %}>Description parser</a></li>
+        <li><a href="{{ '/concepts/fast-lane-baseline.html'     | relative_url }}"{% if a == 'fast-lane-baseline'  %} class="current"{% endif %}>Fast Lane baseline</a></li>
+    </ul>
+    <h3>Reference</h3>
+    <ul>
+        <li><a href="{{ '/reference/'                       | relative_url }}"{% if a == 'reference'          %} class="current"{% endif %}>Overview</a></li>
+        <li><a href="{{ '/reference/features.html'          | relative_url }}"{% if a == 'features'           %} class="current"{% endif %}>Shipped features</a></li>
+        <li><a href="{{ '/reference/file-locations.html'    | relative_url }}"{% if a == 'file-locations'     %} class="current"{% endif %}>File locations</a></li>
+        <li><a href="{{ '/reference/glossary.html'          | relative_url }}"{% if a == 'glossary'           %} class="current"{% endif %}>Glossary</a></li>
+        <li><a href="{{ '/reference/faq.html'               | relative_url }}"{% if a == 'faq'                %} class="current"{% endif %}>FAQ</a></li>
+    </ul>
+    <h3>About</h3>
+    <ul>
+        <li><a href="{{ '/about/credits.html'   | relative_url }}"{% if a == 'credits'   %} class="current"{% endif %}>Credits</a></li>
+        <li><a href="{{ '/about/changelog.html' | relative_url }}"{% if a == 'changelog' %} class="current"{% endif %}>Changelog</a></li>
+    </ul>
+    {% if site.docs_version %}
+    <p class="sidenav-footer">
+        Docs revision <strong>{{ site.docs_version }}</strong>
+        {% if site.docs_updated %}<br>Updated {{ site.docs_updated }}{% endif %}
+    </p>
+    {% endif %}
+</aside>

@@ -1,0 +1,79 @@
+---
+layout: default
+title: Glossary
+active: glossary
+h1: Glossary
+lede: Terms used throughout the docs and the tool.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Reference", href: "/reference/" }
+    - { label: "Glossary" }
+---
+
+<dl>
+    <dt><strong>Creation</strong></dt>
+    <dd>A single entry on Bethesda's Creations store — what players loosely call a "mod" when it comes from the official store. May ship one or more plugin files.</dd>
+
+    <dt><strong>Plugin</strong></dt>
+    <dd>A single <code>.esm</code> or <code>.esp</code> file inside a creation. One creation may have multiple plugins; they always load together as a group.</dd>
+
+    <dt><strong>ESM / ESP</strong></dt>
+    <dd>Bethesda plugin file formats. <em>ESM</em> (Elder Scrolls Master) for master files; <em>ESP</em> (Elder Scrolls Plugin) for regular plugins. The toolkit treats them uniformly.</dd>
+
+    <dt><strong>TES4</strong></dt>
+    <dd>The fixed header record at the start of every plugin file. Names the plugin, lists its masters, and carries other metadata. Stands for "The Elder Scrolls 4" — the format predates Starfield.</dd>
+
+    <dt><strong>MAST subrecord</strong></dt>
+    <dd>An entry inside the TES4 record naming one master dependency. Each MAST is followed by a DATA subrecord (ignored by the toolkit). The set of MASTs defines which plugins must load before this one.</dd>
+
+    <dt><strong>Master</strong></dt>
+    <dd>A plugin file that another plugin depends on. If B lists A as a master, A must load first.</dd>
+
+    <dt><strong>Plugins.txt</strong></dt>
+    <dd>The game's load-order file, listing each installed plugin with an enabled flag. The toolkit edits this (and nothing else in the game folder).</dd>
+
+    <dt><strong>ContentCatalog.txt</strong></dt>
+    <dd>The game's catalogue of installed creations, with IDs, titles, authors, and file mappings. Read-only from the toolkit's perspective.</dd>
+
+    <dt><strong>LOOT</strong></dt>
+    <dd>Load Order Optimisation Tool — the long-standing community sorter for Bethesda games. The toolkit consumes its <em>masterlist</em> (a YAML file) as one of its sorter inputs.</dd>
+
+    <dt><strong>Masterlist</strong></dt>
+    <dd>The YAML document maintained by the LOOT team describing plugin groups and load-order rules.</dd>
+
+    <dt><strong>Rule book</strong></dt>
+    <dd>A JSON file declaring load-order relationships between creations. Curated rule books ship with the toolkit; user rule books are yours to author. See <a href="{{ '/concepts/rulebooks.html' | relative_url }}">Rule books</a>.</dd>
+
+    <dt><strong>Tier</strong></dt>
+    <dd>A slot in the 11-tier community load-order system, derived from Bethesda Creations categories. See <a href="{{ '/concepts/categories-tiers.html' | relative_url }}">Category tiers</a>.</dd>
+
+    <dt><strong>Sort constraint</strong></dt>
+    <dd>A single fact about ordering: <code>load_after</code>, <code>load_before</code>, or <code>tier</code>. Produced by sorters, consumed by the solver.</dd>
+
+    <dt><strong>Sorter</strong></dt>
+    <dd>A pipeline stage that reads some source of truth (plugin headers, LOOT, categories, rule books) and emits sort constraints. Each sorter has a priority.</dd>
+
+    <dt><strong>Priority</strong></dt>
+    <dd>An integer attached to every constraint, used to resolve conflicts between sorters. Higher wins. See <a href="{{ '/concepts/sorter-priority.html' | relative_url }}">Sorter priority</a>.</dd>
+
+    <dt><strong>Auto-Sort</strong></dt>
+    <dd>The pipeline that runs all sorters, merges their constraints, and produces a proposed load order.</dd>
+
+    <dt><strong>Diff dialog</strong></dt>
+    <dd>The review UI shown after Auto-Sort completes. Side-by-side current vs proposed, with per-item Apply/Ignore.</dd>
+
+    <dt><strong>Hint dialog</strong></dt>
+    <dd>Secondary modal opened from the diff, listing every constraint that touched a given item — winners and losers both.</dd>
+
+    <dt><strong>Snapshot</strong></dt>
+    <dd>A saved load-order state. Useful for A/B testing or rollback.</dd>
+
+    <dt><strong>Fast Lanes</strong></dt>
+    <dd>Informal name for Bethesda's April 2026 engine update. The <a href="{{ '/manual/fast-lane-check.html' | relative_url }}">Fast Lane Check</a> compares your creations against a snapshot captured just before this update.</dd>
+
+    <dt><strong>Baseline</strong></dt>
+    <dd>The bundled snapshot the Fast Lane Check compares against.</dd>
+
+    <dt><strong>Achievement friendly</strong></dt>
+    <dd>A flag on each creation indicating whether installing it disables Steam achievements. Reported by the Achievement check.</dd>
+</dl>

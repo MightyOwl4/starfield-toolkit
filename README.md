@@ -34,6 +34,25 @@ Grab the latest `StarfieldToolkit.exe` from [Releases](https://github.com/Mighty
 
 If you prefer to install and compile yourself - look below
 
+# Documentation
+
+Full documentation — user manual, architecture articles, and reference — lives under [`docs/`](docs/index.html) and is published as a GitHub Pages site.
+
+- **Manual** — tab-by-tab walkthrough of the UI
+- **Concepts** — how Auto-Sort works, what rule books are, the sorter priority pipeline, caching, Fast Lane baseline
+- **Reference** — file locations, glossary, FAQ, shipped-features index
+
+To host on GitHub Pages: Settings → Pages → Source = `main` branch, folder = `/docs`.
+
+**Local preview (Docker):**
+
+```bash
+cd docs
+docker compose up
+```
+
+Then open http://localhost:4000/. The container runs Jekyll with the `github-pages` gem (same versions GitHub Pages serves), watches for file changes with polling (works on Windows/WSL), and live-reloads the browser on edit.
+
 # Tools
 
 ## Installed Creations
