@@ -1,0 +1,75 @@
+---
+layout: default
+title: Rule Books tab
+active: rule-books
+h1: Rule Books tab
+lede: Rule books are JSON files that declare explicit load-after or load-before relationships between creations. This tab manages them.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Rule Books" }
+---
+
+<h2>Curated vs user</h2>
+<p>
+    The tool ships with a <strong>curated</strong> set of rule books maintained by the project. You can
+    also author your own <strong>user</strong> rule books. User rule books win over curated ones on
+    conflict, and both rank above LOOT and Categories so a targeted re-tier actually takes effect.
+</p>
+
+<h2>The list</h2>
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-rule-books.png' | relative_url }}" data-lightbox data-caption="Rule Books tab">
+        <img src="{{ '/assets/img/screenshots/tab-rule-books.png' | relative_url }}" alt="Rule Books tab"></a>
+    <figcaption>Rule Books tab</figcaption>
+</figure>
+
+<p>Each row shows:</p>
+<ul>
+    <li><strong>Enable toggle</strong> — turns the rule book on or off without deleting it.</li>
+    <li><strong>Name</strong> and <strong>source</strong> (<span class="pill">curated</span> or <span class="pill accent">user</span>).</li>
+    <li><strong>Rule count</strong> — how many load-after/load-before relationships it declares.</li>
+    <li><strong>Status</strong>:
+        <ul>
+            <li><span class="pill ok">OK</span> — all referenced creations are installed.</li>
+            <li><span class="pill warn">Partial</span> — some referenced creations are missing (rules for them are inert, not errors).</li>
+            <li><span class="pill danger">Invalid</span> — the file failed to parse or referenced something nonsensical.</li>
+        </ul>
+    </li>
+</ul>
+
+<h2>Buttons</h2>
+<table>
+    <tr><th>Button</th><th>What it does</th></tr>
+    <tr><td>Rescan</td><td>Re-reads the rule books directory. Use after dropping a downloaded rule book in by hand.</td></tr>
+    <tr><td>New</td><td>Opens the <a href="{{ '/manual/dialogs.html' | relative_url }}#rulebook-editor">Rule book editor</a> to author a new user rule book.</td></tr>
+    <tr><td>Edit</td><td>Opens the editor on the selected user rule book. Curated books are read-only.</td></tr>
+    <tr><td>Reveal</td><td>Opens the rule book file in Explorer.</td></tr>
+    <tr><td>Delete</td><td>Removes a user rule book (curated books cannot be deleted, only disabled).</td></tr>
+</table>
+
+<h2>Authoring a rule book</h2>
+<p>
+    The editor is a creation picker plus a drag-reorder list. Pick the creations you want to order
+    relative to each other, arrange them top-to-bottom, and save. The tool converts the ordering into
+    <code>load_after</code> rules under the hood.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/edit-rulebook-dialog.png' | relative_url }}" data-lightbox data-caption="Rule book editor">
+        <img src="{{ '/assets/img/screenshots/edit-rulebook-dialog.png' | relative_url }}" alt="Rule book editor"></a>
+    <figcaption>Rule book editor</figcaption>
+</figure>
+
+<p>For the file format and precedence rules see the <a href="{{ '/concepts/rulebooks.html' | relative_url }}">Rule books architecture article</a>.</p>
+
+<div class="callout tip">
+    <span class="label">Tip</span>
+    User rule books live in a specific folder — see <a href="{{ '/reference/file-locations.html' | relative_url }}">File locations</a>.
+    You can back them up, commit them to git, or share them with friends.
+</div>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 007 — rule books</li>
+    <li>Feature 008 — description-derived rule books</li>
+</ul></div>

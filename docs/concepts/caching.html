@@ -1,0 +1,69 @@
+---
+layout: default
+title: API caching
+active: caching
+h1: API caching
+lede: The toolkit caches aggressively. Here's what's cached, for how long, and why.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "API caching" }
+---
+
+<h2>Why cache</h2>
+<p>
+    The Bethesda Creations API is undocumented and rate-limited. Round-trip times vary from fast to
+    abysmal. The toolkit caches locally so that:
+</p>
+<ul>
+    <li>Tab switches are instant — no re-fetching on every view.</li>
+    <li>A cold start is pleasant — what you saw last session is still there.</li>
+    <li>The API doesn't get hammered for data that doesn't change.</li>
+</ul>
+
+<h2>Immutable vs volatile fields</h2>
+<p>The toolkit splits every creation's metadata into two buckets:</p>
+<table>
+    <tr><th>Bucket</th><th>Examples</th><th>TTL</th></tr>
+    <tr><td>Immutable</td><td>Title, author, creation ID, achievement-friendly flag, first release date</td><td>Permanent</td></tr>
+    <tr><td>Volatile</td><td>Latest version, price, download size, description, release notes</td><td>30-minute session window</td></tr>
+</table>
+<p>
+    Immutable fields, once cached, are never refetched unless you hit <em>Clear Cache</em>. Volatile
+    fields are considered fresh for 30 minutes per process lifetime — the second time you open the
+    same creation in a session, it's read straight from disk.
+</p>
+
+<h2>Explicit refreshes</h2>
+<p>The <em>Check for Updates</em> and <em>Check Achievements</em> buttons bypass the staleness window and always hit the API. This is how you guarantee a fresh read when you want one.</p>
+
+<h2>Disk layout</h2>
+<p>Cached files live under a per-user data directory:</p>
+<ul>
+    <li><code>creations/&lt;id&gt;.json</code> — one file per creation, merging immutable + volatile fields.</li>
+    <li><code>thumbnails/&lt;id&gt;.jpg</code> — downloaded creation thumbnail.</li>
+    <li><code>loot/</code> — fetched LOOT masterlist with a timestamp.</li>
+    <li><code>catalogue/</code> — the offline text catalogue (see below).</li>
+</ul>
+<p>Exact paths in <a href="{{ '/reference/file-locations.html' | relative_url }}">File locations</a>.</p>
+
+<h2>The offline text catalogue</h2>
+<p>
+    A separate scraper (Feature 005) maintains a catalogue of <em>all</em> ~5K Starfield creations —
+    not just the ones you have installed. It stores description and release-notes text plus metadata
+    and SHA-256 content hashes. This catalogue feeds the
+    <a href="{{ '/concepts/description-parser.html' | relative_url }}">Description parser</a> and the
+    <a href="{{ '/concepts/fast-lane-baseline.html' | relative_url }}">Fast Lane baseline</a>.
+</p>
+
+<h2>Rate limiting</h2>
+<p>
+    The API client uses exponential backoff with jitter on 429/503 responses and a single-flight
+    guard so two tabs can't redundantly request the same creation at the same time. The status bar
+    shows when a rate-limit wait is in progress.
+</p>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 002 — API response caching</li>
+    <li>Feature 005 — Creations text catalogue</li>
+</ul></div>

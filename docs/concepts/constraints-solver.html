@@ -1,0 +1,73 @@
+---
+layout: default
+title: Constraints solver
+active: constraints-solver
+h1: Constraints solver
+lede: How constraints from four sorters become one linear load order.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "Constraints solver" }
+---
+
+<h2>The constraint bag</h2>
+<p>
+    After every sorter has run, the merger receives a flat list of constraints, each one tagged with
+    source and priority. Types:
+</p>
+<ul>
+    <li><code>load_after(A, B)</code> — A must appear after B.</li>
+    <li><code>load_before(A, B)</code> — normalized at intake to <code>load_after(B, A)</code>.</li>
+    <li><code>tier(X, N)</code> — X is in tier N (soft).</li>
+</ul>
+
+<h2>Merge step</h2>
+<p>For each pair of creations, the merger keeps the single highest-priority ordering constraint:</p>
+<ul>
+    <li>If both sorters agree (same direction), it's not really a conflict — the winner's attribution is recorded but the order is the same.</li>
+    <li>If they disagree, the higher-priority source wins and the loser is appended to a <em>rejected</em> list for display in the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Hint dialog</a>.</li>
+</ul>
+<p>
+    Tier constraints are considered last. For any creation not otherwise constrained against another,
+    its tier defines its default group; within a tier, original read order is preserved.
+</p>
+
+<h2>Topological sort</h2>
+<p>
+    The merged ordering constraints form a DAG. The solver runs a <strong>stable</strong> Kahn's
+    algorithm:
+</p>
+<ol>
+    <li>Start with nodes of in-degree zero, ordered by (tier, original read index).</li>
+    <li>Repeatedly pop the smallest-key ready node, output it, and decrement its neighbours' in-degrees.</li>
+    <li>Any node becoming ready is inserted into the priority queue with the same key.</li>
+</ol>
+<p>
+    Stability means: if a creation is <em>not</em> constrained to move, it stays where it was. This
+    is important for making the diff readable — the user should see moves only where the tool had a
+    reason to move something.
+</p>
+
+<h2>Cycle detection</h2>
+<p>
+    Cycles can happen: two rule books disagreeing, or an inconsistent masterlist entry. The solver
+    detects them (any nodes remaining after Kahn's finishes) and reports the cycle to the diff as
+    an error. Auto-Sort refuses to propose a partial ordering — the user is told which creations are
+    involved and which constraints form the cycle, so they can disable one or edit the responsible
+    rule book.
+</p>
+
+<h2>TES4 short-circuit</h2>
+<p>
+    TES4 constraints are applied to the graph first and locked: subsequent merge passes cannot
+    override them (their priority 100 exceeds every other source, but the solver also marks them
+    <em>immutable</em> as a belt-and-braces check). Apply-time validation re-checks them on the
+    final ordering.
+</p>
+
+<h2>Complexity</h2>
+<p>
+    With a few hundred installed creations and a few thousand total constraints, the solve is
+    essentially instantaneous — well under 100ms. The bottleneck in Auto-Sort is I/O (TES4 parsing
+    and LOOT fetch), not the solver.
+</p>

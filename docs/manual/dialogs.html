@@ -1,0 +1,75 @@
+---
+layout: default
+title: Dialogs reference
+active: dialogs
+h1: Dialogs reference
+lede: Every modal dialog in the app, in one place.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Dialogs" }
+---
+
+<h2 id="creation-details">Creation details</h2>
+<p>Opened from the Installed Creations tab. Read-only view of everything the local cache knows about one creation.</p>
+<table>
+    <tr><th>Field</th><th>Source</th></tr>
+    <tr><td>Title, author</td><td>API; cached permanently (immutable).</td></tr>
+    <tr><td>Description, release notes</td><td>API; re-fetched per session after staleness window.</td></tr>
+    <tr><td>Version, price, size</td><td>API; volatile — refreshed with each explicit check.</td></tr>
+    <tr><td>Categories</td><td>API; cached.</td></tr>
+    <tr><td>Achievement friendly</td><td>API; cached permanently.</td></tr>
+    <tr><td>First seen / last updated</td><td>Computed by the toolkit from cache history.</td></tr>
+    <tr><td>Thumbnail</td><td>API; cached as file on disk.</td></tr>
+</table>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/installed-creations-details-dialog.png' | relative_url }}" data-lightbox data-caption="Creation details dialog">
+        <img src="{{ '/assets/img/screenshots/installed-creations-details-dialog.png' | relative_url }}" alt="Creation details dialog"></a>
+    <figcaption>Creation details</figcaption>
+</figure>
+
+<h2 id="diff">Diff dialog</h2>
+<p>Covered on its own page: <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>.</p>
+
+<h2 id="hint">Hint dialog</h2>
+<p>
+    Opened by clicking a hint icon next to a moved item in the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>.
+    Lists every constraint that touched that item:
+</p>
+<ul>
+    <li>The sorter that contributed it (TES4 / LOOT / Categories / Rule Book) with a priority badge.</li>
+    <li>The constraint type (<code>load_after</code>, <code>load_before</code>, <code>tier</code>).</li>
+    <li>The other creation involved.</li>
+    <li>A <span class="pill ok">winner</span> or <span class="pill">overridden</span> badge.</li>
+    <li>For rule-book constraints: the source file name.</li>
+</ul>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/diff-hint-dialog.png' | relative_url }}" data-lightbox data-caption="Hint dialog">
+        <img src="{{ '/assets/img/screenshots/diff-hint-dialog.png' | relative_url }}" alt="Hint dialog"></a>
+    <figcaption>Hint dialog</figcaption>
+</figure>
+
+<h2 id="rulebook-editor">Rule book editor</h2>
+<p>
+    Opened from the <a href="{{ '/manual/rule-books.html' | relative_url }}">Rule Books tab</a> with <em>New</em> or <em>Edit</em>.
+    Two panes:
+</p>
+<ol>
+    <li><strong>Creation picker</strong> — search and add the creations you want this rule book to order.</li>
+    <li><strong>Ordering list</strong> — drag-reorder to declare the relative order. Top loads first.</li>
+</ol>
+<p>Metadata fields: name, description, enabled flag. Saving writes a JSON file to the user rule book directory.</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/edit-rulebook-dialog.png' | relative_url }}" data-lightbox data-caption="Rule book editor">
+        <img src="{{ '/assets/img/screenshots/edit-rulebook-dialog.png' | relative_url }}" alt="Rule book editor"></a>
+    <figcaption>Rule book editor</figcaption>
+</figure>
+
+<div class="callout">
+    <span class="label">Note</span>
+    All dialogs are non-modal in the Windows-focus sense — you can <kbd>Win</kbd>+<kbd>D</kbd> to the
+    desktop and click back to the toolkit without losing dialog state.
+</div>

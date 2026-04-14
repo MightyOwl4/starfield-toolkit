@@ -1,0 +1,77 @@
+---
+layout: default
+title: Installation & first run
+active: installation
+h1: Installation & first run
+lede: How to get the toolkit on your machine and point it at Starfield.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Installation" }
+---
+
+<h2>Requirements</h2>
+<ul>
+    <li><strong>Windows 10 or 11</strong> (64-bit). No Linux or macOS support.</li>
+    <li><strong>Starfield installed via Steam.</strong> The tool auto-detects standard Steam library paths.</li>
+    <li>An internet connection for update checks and LOOT masterlist fetches (both have offline fallbacks).</li>
+</ul>
+
+<h2>Download</h2>
+<p>
+    Grab the latest <code>StarfieldToolkit.exe</code> from the
+    <a href="{{ site.github_repo }}/releases">Releases page</a>.
+    It's a single-file PyInstaller build — no installer, no admin rights required.
+    Put it wherever you keep your modding utilities.
+</p>
+
+<div class="callout warn">
+    <span class="label">Heads up</span>
+    Windows SmartScreen will flag the first launch because the binary is unsigned. Click
+    <em>More info</em>, then <em>Run anyway</em> — see <a href="{{ '/reference/faq.html' | relative_url }}">the FAQ</a>
+    for context. This warning only appears on the first run of a given release.
+</div>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/first-launch-smartscreen.png' | relative_url }}" data-lightbox data-caption="Windows SmartScreen warning on first launch">
+        <img src="{{ '/assets/img/screenshots/first-launch-smartscreen.png' | relative_url }}" alt="Windows SmartScreen warning on first launch">
+    </a>
+    <figcaption>Windows SmartScreen warning — expected, not malware</figcaption>
+</figure>
+
+<h2>First launch</h2>
+<p>On first launch the tool will:</p>
+<ol>
+    <li>Try to locate your Starfield install via the Steam library registry.</li>
+    <li>Read <code>Plugins.txt</code> and <code>ContentCatalog.txt</code> from your <code>Documents/My Games/Starfield/</code> folder.</li>
+    <li>Populate the <strong>Installed Creations</strong> tab from the content catalogue.</li>
+</ol>
+
+<h2>Setting the game path manually</h2>
+<p>
+    If auto-detection fails (unusual Steam layout, game moved after install, no library manifest),
+    the status bar will show a warning in the left segment. Click it — or use the path field in
+    the Installed Creations tab — and point it at the folder that contains <code>Starfield.exe</code>.
+    The tool remembers this between sessions.
+</p>
+
+<h2>The status bar</h2>
+<p>Two segments, always visible:</p>
+<table>
+    <tr><th>Segment</th><th>What it shows</th></tr>
+    <tr><td>Left</td><td>Configured game path, or a red warning when unset or invalid.</td></tr>
+    <tr><td>Right</td><td>Current background task, e.g. <em>Fetching LOOT masterlist…</em>. Empty when idle.</td></tr>
+</table>
+
+<h2>What the tool writes</h2>
+<ul>
+    <li><code>Plugins.txt</code> — only when you explicitly Apply a load-order change.</li>
+    <li>A local cache directory — API responses, thumbnails, fetched LOOT masterlist, baseline snapshots.</li>
+    <li>User rule books — when you create or edit them.</li>
+</ul>
+<p>See <a href="{{ '/reference/file-locations.html' | relative_url }}">File locations</a> for exact paths.</p>
+
+<h2>Next</h2>
+<p>Once the path is set and your creations are listed, head to
+<a href="{{ '/manual/installed-creations.html' | relative_url }}">Installed Creations</a> to explore them, or jump straight to
+<a href="{{ '/manual/load-order.html' | relative_url }}">Load Order</a> to try Auto-Sort.</p>

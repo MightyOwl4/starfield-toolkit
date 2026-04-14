@@ -1,0 +1,29 @@
+---
+layout: default
+title: Shipped features
+active: features
+wide: true
+h1: Shipped features
+lede: Every feature in the toolkit has a formal specification under specs/ in the repository. This page is the index.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Reference", href: "/reference/" }
+    - { label: "Features" }
+---
+
+<table>
+    <tr><th>#</th><th>Title</th><th>Summary</th><th>Manual</th><th>Concepts</th></tr>
+    <tr><td>001</td><td>Tabbed GUI toolbox</td><td>Foundation: tabbed shell, game-path detection, status bar, installed creations list.</td><td><a href="{{ '/manual/installation.html' | relative_url }}">Install</a></td><td>—</td></tr>
+    <tr><td>002</td><td>API response caching</td><td>Persistent disk cache with session staleness windows for volatile fields.</td><td>—</td><td><a href="{{ '/concepts/caching.html' | relative_url }}">Caching</a></td></tr>
+    <tr><td>003</td><td>Load order sorting tool</td><td>Drag-and-drop plus Auto-Sort pipeline with diff view.</td><td><a href="{{ '/manual/load-order.html' | relative_url }}">Load Order</a></td><td><a href="{{ '/concepts/autosort-overview.html' | relative_url }}">Auto-Sort</a></td></tr>
+    <tr><td>004</td><td>Grid modes &amp; details dialog</td><td>Text list vs rich media modes, reusable creation details modal.</td><td><a href="{{ '/manual/installed-creations.html' | relative_url }}">Installed Creations</a></td><td>—</td></tr>
+    <tr><td>005</td><td>Creations text catalogue</td><td>Offline scraper enumerating all ~5K Starfield creations.</td><td>—</td><td><a href="{{ '/concepts/caching.html' | relative_url }}">Caching</a></td></tr>
+    <tr><td>006</td><td>TES4 master dependency sorting</td><td>Hard-gate sorter reading plugin headers.</td><td>—</td><td><a href="{{ '/concepts/tes4-masters.html' | relative_url }}">TES4</a></td></tr>
+    <tr><td>007</td><td>Load order rule books</td><td>User and curated rule books with editor.</td><td><a href="{{ '/manual/rule-books.html' | relative_url }}">Rule Books</a></td><td><a href="{{ '/concepts/rulebooks.html' | relative_url }}">Rule books</a></td></tr>
+    <tr><td>008</td><td>Description dependency parser</td><td>LLM-based extraction of load-order hints from descriptions.</td><td>—</td><td><a href="{{ '/concepts/description-parser.html' | relative_url }}">Parser</a></td></tr>
+    <tr><td>009</td><td>Fast Lane creation check</td><td>Compatibility check against April 2026 baseline.</td><td><a href="{{ '/manual/fast-lane-check.html' | relative_url }}">Fast Lane</a></td><td><a href="{{ '/concepts/fast-lane-baseline.html' | relative_url }}">Baseline</a></td></tr>
+    <tr><td>010</td><td>Diff connectors &amp; hints</td><td>Visual connectors and per-item constraint explanation.</td><td><a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff</a></td><td>—</td></tr>
+    <tr><td>011</td><td>Fast Lane category refinement</td><td>SAFE/LOW_RISK refinement of the Fast Lane check.</td><td><a href="{{ '/manual/fast-lane-check.html' | relative_url }}">Fast Lane</a></td><td><a href="{{ '/concepts/categories-tiers.html' | relative_url }}">Tiers</a></td></tr>
+</table>
+
+<p>For full specifications, see the per-feature <code>spec.md</code>, <code>plan.md</code>, and <code>tasks.md</code> files under <code>specs/NNN-*/</code> in the repository.</p>

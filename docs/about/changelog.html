@@ -1,0 +1,49 @@
+---
+layout: default
+title: Changelog
+active: changelog
+h1: Changelog
+lede: Features have been shipped in spec-numbered order. For the authoritative per-PR history see the git log on main.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "About" }
+    - { label: "Changelog" }
+---
+
+<p>For the authoritative per-PR history see the <a href="{{ site.github_repo }}/commits/main">git log on <code>main</code></a>.</p>
+
+<h2>Feature highlights</h2>
+<dl>
+    <dt><strong>011 — Fast Lane category refinement</strong></dt>
+    <dd>Added SAFE and LOW_RISK category buckets to the Fast Lane check, cutting cosmetic false-positives. See <a href="{{ '/manual/fast-lane-check.html' | relative_url }}">Fast Lane Check</a>.</dd>
+
+    <dt><strong>010 — Diff connectors &amp; hints</strong></dt>
+    <dd>Colored Bezier connectors between diff panels and per-move Hint dialog showing every constraint considered. See <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>.</dd>
+
+    <dt><strong>009 — Fast Lane creation check</strong></dt>
+    <dd>New tab: check installed (or imported) creations against the April 2026 baseline.</dd>
+
+    <dt><strong>008 — Description dependency parser</strong></dt>
+    <dd>Offline LLM pipeline producing curated rule books from creation descriptions. See <a href="{{ '/concepts/description-parser.html' | relative_url }}">Description parser</a>.</dd>
+
+    <dt><strong>007 — Load order rule books</strong></dt>
+    <dd>User and curated rule books with an editor. See <a href="{{ '/manual/rule-books.html' | relative_url }}">Rule Books tab</a>.</dd>
+
+    <dt><strong>006 — TES4 master dependency sorting</strong></dt>
+    <dd>Hard-gate sorter reading plugin headers; non-bypassable Apply-time validation.</dd>
+
+    <dt><strong>005 — Creations text catalogue</strong></dt>
+    <dd>Offline scraper enumerating all ~5K creations, feeding 008 and 009.</dd>
+
+    <dt><strong>004 — Grid modes &amp; details dialog</strong></dt>
+    <dd>Text list / rich media toggle, reusable details modal.</dd>
+
+    <dt><strong>003 — Load order sorting tool</strong></dt>
+    <dd>Drag-and-drop plus Auto-Sort with diff view.</dd>
+
+    <dt><strong>002 — API response caching</strong></dt>
+    <dd>Persistent cache with immutable/volatile field split and session staleness windows.</dd>
+
+    <dt><strong>001 — Tabbed GUI toolbox</strong></dt>
+    <dd>Initial shell, game-path detection, status bar, installed creations list.</dd>
+</dl>

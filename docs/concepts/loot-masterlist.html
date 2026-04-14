@@ -1,0 +1,60 @@
+---
+layout: default
+title: LOOT masterlist
+active: loot-masterlist
+h1: LOOT masterlist
+lede: Community-curated ordering rules, fetched from the public LOOT Starfield masterlist.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "LOOT masterlist" }
+---
+
+<h2>What LOOT is</h2>
+<p>
+    <a href="https://loot.github.io/">LOOT</a> (Load Order Optimisation Tool) is the long-standing
+    community tool for sorting Bethesda game plugins. Its <em>masterlist</em> is a YAML document
+    maintained on GitHub that describes groups and load-after/load-before relationships for known
+    plugins. LOOT itself is a separate program; this toolkit consumes its data.
+</p>
+
+<h2>Fetch &amp; fallback</h2>
+<p>
+    On startup the toolkit attempts to fetch the latest masterlist from its public GitHub URL. If
+    the fetch fails (offline, GitHub rate limit, DNS issue), a bundled copy — the version shipped
+    with the toolkit release — is used instead. A fresh fetch is attempted once per session.
+</p>
+
+<h2>Group model</h2>
+<p>
+    The masterlist organises plugins into <em>groups</em> (e.g. <em>Early Loaders</em>, <em>Large
+    Mods</em>, <em>Default</em>, <em>Last Loaders</em>). Groups have a declared load order relative
+    to each other; plugins assigned to a group inherit that ordering. Individual plugin entries
+    may also declare explicit <code>after</code> or <code>req</code> rules.
+</p>
+
+<h2>Constraint emission</h2>
+<p>For each relevant entry, the LOOT sorter emits constraints at priority 20:</p>
+<ul>
+    <li>Group-to-group rules → pairwise <code>load_after</code> between plugins in those groups.</li>
+    <li>Plugin-level <code>after</code> → <code>load_after</code> constraint.</li>
+    <li>Plugin-level <code>req</code> → treated as a load-after for ordering purposes (the requirement itself is a separate concern).</li>
+</ul>
+
+<h2>Coverage</h2>
+<p>
+    The LOOT masterlist covers <em>known</em> plugins. Bethesda Creations is relatively new and
+    coverage evolves; a creation that isn't in the masterlist contributes no LOOT constraints. The
+    toolkit doesn't warn about missing coverage — it just falls through to Categories and Rule Books.
+</p>
+
+<div class="callout tip">
+    <span class="label">Contributing</span>
+    If you want better LOOT coverage for a creation, the right place is the
+    <a href="https://github.com/loot/starfield">LOOT Starfield masterlist repo</a>. The toolkit
+    picks up their updates automatically.
+</div>
+
+<div class="spec-refs"><h4>Internal references</h4><ul>
+    <li>Feature 003 — LOOT masterlist sorter</li>
+</ul></div>

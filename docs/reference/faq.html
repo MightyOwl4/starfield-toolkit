@@ -1,0 +1,86 @@
+---
+layout: default
+title: FAQ
+active: faq
+h1: FAQ
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Reference", href: "/reference/" }
+    - { label: "FAQ" }
+---
+
+<h2>Does this work with Nexus mods?</h2>
+<p>
+    No. The toolkit targets players using Bethesda's official Creations store exclusively. If you
+    install mods from Nexus or by hand, their plugin files <em>will</em> appear in your load order
+    and the TES4 sorter will still do the right thing — but the toolkit's API-driven features
+    (details, updates, Fast Lane check) only work for catalogued creations. Mixing is at your own
+    risk and unsupported.
+</p>
+
+<h2>Linux? macOS?</h2>
+<p>
+    Windows only. Starfield on Steam. There are no plans to port. The codebase is Python, so you
+    might get it running on Proton with some grief, but we don't test that path.
+</p>
+
+<h2>Windows Defender / SmartScreen warns about the binary</h2>
+<p>
+    The binary is unsigned. SmartScreen will show a "Windows protected your PC" banner on first
+    launch — click <em>More info</em>, then <em>Run anyway</em>. The project source is open and the
+    binary is built in GitHub Actions from a pinned commit; you can audit the build yourself, or
+    build from source if you prefer.
+</p>
+
+<h2>Auto-Sort moved something I don't want moved</h2>
+<p>
+    You have two tools: in the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>, reject that
+    specific move with <em>Ignore</em>. For a permanent fix, create a user rule book that pins the
+    creation where you want it — user rule books win against all other sorters at the same priority
+    level. See <a href="{{ '/concepts/rulebooks.html' | relative_url }}">Rule books</a>.
+</p>
+
+<h2>Apply is refused with a TES4 error</h2>
+<p>
+    Your current load order (after your per-item accepts/ignores) violates a master dependency. The
+    dialog names the pair. Either accept the move that fixes the dependency, or investigate the
+    plugin file — rarely, a broken plugin declares a master that isn't actually needed.
+</p>
+
+<h2>What about cycles?</h2>
+<p>
+    If Auto-Sort detects a cycle (two creations each demanding to load after the other), it refuses
+    to propose a partial ordering and shows the cycle in the diff. Disable one of the rules
+    involved — usually a rule book — and retry.
+</p>
+
+<h2>Why is Fast Lane Check marking everything "Updated"?</h2>
+<p>
+    Either your creations really have all been updated, or a previous toolkit release's baseline
+    predates them. Make sure you're on the latest toolkit build.
+</p>
+
+<h2>Can I share my rule books?</h2>
+<p>
+    Yes — they're plain JSON, machine-independent. Copy the files out of your
+    <a href="{{ '/reference/file-locations.html' | relative_url }}">user rule books directory</a> and hand them to whoever needs them.
+</p>
+
+<h2>Where are the logs?</h2>
+<p>
+    The current release doesn't persist logs to disk — the GUI writes diagnostics to stdout
+    only. If you're running the packaged <code>StarfieldToolkit.exe</code> from a regular
+    double-click, there's nothing to attach.
+</p>
+<p>
+    If you can reproduce the problem, re-launch from a terminal (<kbd>Win</kbd>+<kbd>R</kbd> →
+    <code>cmd</code>, then <code>"C:\path\to\StarfieldToolkit.exe"</code>) so stdout is visible,
+    reproduce the bug, and paste the terminal output into the issue.
+</p>
+
+<h2>I'm paranoid — what does the tool actually write?</h2>
+<ul>
+    <li><strong>To the game folder:</strong> only <code>%LOCALAPPDATA%\Starfield\Plugins.txt</code>, only on Apply.</li>
+    <li><strong>To <code>%APPDATA%\StarfieldToolkit\</code>:</strong> <code>config.json</code>, the offline creations catalogue, cached thumbnails, and any rule books you author.</li>
+    <li><strong>Never:</strong> plugin files, the game's Data folder, registry, or anything outside its own scope.</li>
+</ul>

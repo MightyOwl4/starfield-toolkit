@@ -1,0 +1,66 @@
+---
+layout: default
+title: Sorter priority
+active: sorter-priority
+h1: Sorter priority
+lede: Which sorter's opinion wins when two disagree, and why the priority numbers are what they are.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Concepts", href: "/concepts/" }
+    - { label: "Sorter priority" }
+---
+
+<h2>The hierarchy</h2>
+<table>
+    <tr><th>Sorter</th><th>Priority</th><th>Nature</th><th>Source of truth</th></tr>
+    <tr><td><a href="{{ '/concepts/tes4-masters.html'     | relative_url }}">TES4 masters</a></td><td><span class="priority-badge">100</span></td><td>Hard, non-bypassable</td><td>Plugin headers on disk</td></tr>
+    <tr><td><a href="{{ '/concepts/rulebooks.html'        | relative_url }}">Rule books — user</a></td><td><span class="priority-badge">40+</span></td><td>Targeted fixes</td><td>Your JSON files</td></tr>
+    <tr><td><a href="{{ '/concepts/rulebooks.html'        | relative_url }}">Rule books — curated</a></td><td><span class="priority-badge">30</span></td><td>Targeted fixes, shipped</td><td>Bundled JSON files</td></tr>
+    <tr><td><a href="{{ '/concepts/loot-masterlist.html'  | relative_url }}">LOOT</a></td><td><span class="priority-badge">20</span></td><td>Curated community list</td><td>Community YAML (GitHub)</td></tr>
+    <tr><td><a href="{{ '/concepts/categories-tiers.html' | relative_url }}">Categories</a></td><td><span class="priority-badge">10</span></td><td>Heuristic baseline</td><td>Bethesda API categories</td></tr>
+</table>
+
+<p>
+    Higher numbers win. If two constraints touch the same pair of creations, the one from the
+    higher-priority source wins outright; the loser is recorded and shown in the Hint dialog.
+</p>
+
+<h2>Why TES4 is at 100</h2>
+<p>
+    TES4 master dependencies are <em>engine-enforced</em>: if creation B lists creation A as a master
+    and A is loaded after B, the game will either fail to load or behave unpredictably. The toolkit
+    treats TES4 as a <em>hard gate</em> — not only does its priority beat every other sorter, but
+    a proposal that violates it is refused at Apply time. Everything else is advisory; TES4 is law.
+</p>
+
+<h2>Why rule books outrank LOOT and Categories</h2>
+<p>
+    Rule books exist precisely to <em>fix</em> the cases where Categories tiers a creation wrongly
+    or where the LOOT Starfield masterlist hasn't caught up. Starfield is young, LOOT coverage is
+    still evolving, and the category mapping is a blunt instrument — so a rule book entry is almost
+    always a deliberate correction of one of those two sources. If rule books sat below them, a
+    small, targeted re-tier (e.g. the curated single-rule book re-tiering PDY) would silently lose
+    to the very sorter it was meant to override. Putting rule books above LOOT and Categories makes
+    the override work without special-casing.
+</p>
+<p>
+    Within rule books there is a second-tier priority: <strong>user rule books beat curated ones</strong>,
+    and later user rule books beat earlier ones. So <em>your</em> rule always wins against a canned one.
+</p>
+
+<h2>Soft vs hard constraints</h2>
+<p>
+    <code>tier(X, N)</code> is a <em>soft</em> constraint: it asserts where X belongs in the category
+    system, but a matching-priority <code>load_after</code> overrides it. This is what lets a rule
+    book say "load X after Y" without you also having to re-declare X's tier — the category system's
+    opinion is used for everything else and gently displaced where it conflicts.
+</p>
+
+<h2>What this means for the diff</h2>
+<p>
+    Every moved item in the <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a> is tagged with
+    the source that "won" it. If you see lots of TES4 tags, your current order has unresolved master
+    dependencies (serious). If you see lots of LOOT, the community masterlist has opinions about
+    your library. If you see mostly Categories, you're in the soft-constraint regime — and rule
+    books give you a place to tune.
+</p>

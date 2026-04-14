@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Metallic grain backdrop, matching assets/icon.png.
+    Base:   vertical linear gradient #222a30 → #1a1f25 (sampled from icon corners).
+    Grain:  fractal-noise turbulence composited over the base at low opacity.
+    Seamless across tile boundaries via stitchTiles="stitch".
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" preserveAspectRatio="none">
+    <defs>
+        <linearGradient id="base" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#222a30"/>
+            <stop offset="1" stop-color="#1a1f25"/>
+        </linearGradient>
+        <!-- Bright grain: lightens occasional pixels. -->
+        <filter id="grainLight" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" stitchTiles="stitch" seed="7"/>
+            <feColorMatrix values="0 0 0 0 0.82
+                                   0 0 0 0 0.88
+                                   0 0 0 0 0.96
+                                   0.22 0 0 0 -0.08"/>
+        </filter>
+        <!-- Dark grain: darkens occasional pixels, with a second seed so it doesn't overlap the light one. -->
+        <filter id="grainDark" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" stitchTiles="stitch" seed="23"/>
+            <feColorMatrix values="0 0 0 0 0
+                                   0 0 0 0 0
+                                   0 0 0 0 0
+                                   0.22 0 0 0 -0.08"/>
+        </filter>
+    </defs>
+    <rect width="240" height="240" fill="url(#base)"/>
+    <rect width="240" height="240" filter="url(#grainLight)"/>
+    <rect width="240" height="240" filter="url(#grainDark)"/>
+</svg>
