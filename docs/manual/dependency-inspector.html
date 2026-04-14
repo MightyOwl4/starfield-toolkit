@@ -1,0 +1,86 @@
+---
+layout: default
+title: Dependency Inspector tab
+active: dependency-inspector
+h1: Dependency Inspector tab
+lede: Visualise hard and soft dependencies across your installed creations and see, before you remove anything, what else would break.
+crumbs:
+    - { label: "Home", href: "/" }
+    - { label: "Manual", href: "/manual/" }
+    - { label: "Dependency Inspector" }
+---
+
+<h2>What you see</h2>
+<p>
+    A centered list of every installed creation in load order, with curved
+    connectors drawn on both sides linking each creation to the ones it depends
+    on (or that depend on it). The visual language matches the
+    <a href="{{ '/manual/load-order-diff.html' | relative_url }}">Diff dialog</a>:
+    coloured Bezier curves, endpoint dots, and the same white-glow
+    highlight-and-dim treatment when a row is selected.
+</p>
+
+<figure class="shot">
+    <a href="{{ '/assets/img/screenshots/tab-dependency-inspector.png' | relative_url }}" data-lightbox data-caption="Dependency Inspector — full graph">
+        <img src="{{ '/assets/img/screenshots/tab-dependency-inspector.png' | relative_url }}" alt="Dependency Inspector tab — centered grid with side connectors"></a>
+    <figcaption>The full dependency graph for the current load order</figcaption>
+</figure>
+
+<h2>Reading the graph</h2>
+<ul>
+    <li><strong>Connectors</strong> are split between the left and right sides of the grid by a router that minimises crossings — there is no semantic difference between the two sides.</li>
+    <li><strong>Row colour</strong> matches the colour of that creation's first outgoing edge ("depends on"). If a creation has only incoming edges ("is depended on by"), the colour comes from the first incoming edge instead. Outgoing always wins when both exist.</li>
+    <li><strong>Hard vs soft</strong> edges share the same palette; soft edges are drawn slightly thinner. Toggle <em>Hide soft dependencies</em> to focus on the breakage-critical hard set.</li>
+    <li><strong>Creations with no known dependencies</strong> are folded into a single <code>— N collapsed —</code> separator row by default. Flip the toggle off to see them inline.</li>
+    <li><strong>A red <code>!</code></strong> in the leftmost column flags a row whose <em>hard</em> dependency points at a creation you don't have installed — the connector itself is omitted to keep the graph clean.</li>
+</ul>
+
+<h2>Selection &amp; highlighting</h2>
+<p>
+    Click any creation. The directed transitive closure — every creation it
+    transitively depends on (above) and every creation that transitively depends
+    on it (below) — highlights in white with a soft glow. Everything else dims.
+    Siblings that merely share a common dependency with the selected creation
+    are <em>not</em> highlighted; the selection answers "what would break if I
+    removed this?" rather than "what's vaguely related?".
+</p>
+<p>
+    Click the same row again, or click any empty area (canvas, separator row,
+    margin), to clear the selection.
+</p>
+
+<h2>Controls</h2>
+<table>
+    <tr><th>Control</th><th>What it does</th></tr>
+    <tr><td>Refresh</td><td>Re-reads <code>Plugins.txt</code> and the catalogue, rebuilds the graph, and clears the current selection.</td></tr>
+    <tr><td>Hide soft dependencies</td><td>Toggles connectors sourced from the description-parser rule book. Palette colours and the collapsed-runs view are <em>not</em> recomputed when this toggles.</td></tr>
+    <tr><td>Collapse creations without dependencies</td><td>Replaces contiguous runs of no-dependency creations with a single <code>— N collapsed —</code> separator row. Enabled by default.</td></tr>
+</table>
+
+<h2>What this tab does <em>not</em> do</h2>
+<p>
+    The Dependency Inspector is read-only. It will not disable, remove, or
+    reorder anything — those actions belong in the in-game Creations menu and
+    the <a href="{{ '/manual/load-order.html' | relative_url }}">Load Order tab</a>.
+    The inspector exists purely so you can make those decisions with full
+    information, rather than discovering breakage after the fact.
+</p>
+
+<h2>Where the data comes from</h2>
+<ul>
+    <li><strong>Hard dependencies</strong> — each creation's <code>required_mods</code> field from the local creations catalogue (populated by the <a href="{{ '/manual/installed-creations.html' | relative_url }}">Installed Creations</a> update check).</li>
+    <li><strong>Soft dependencies</strong> — the <code>patch_order_rules.json</code> file produced by the <a href="{{ '/concepts/description-parser.html' | relative_url }}">description parser</a> when run.</li>
+</ul>
+<p>
+    Edges pointing at uninstalled creations are dropped from the graph entirely
+    (no stub connectors). Hard misses raise the warning indicator on the
+    dependent row; soft misses are silent.
+</p>
+
+<div class="spec-refs">
+    <h4>Internal references</h4>
+    <ul>
+        <li>Feature 010 — diff connectors (visual primitives reused here)</li>
+        <li>Feature 012 — Dependency Inspector</li>
+    </ul>
+</div>

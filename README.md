@@ -36,13 +36,15 @@ If you prefer to install and compile yourself - look below
 
 # Documentation
 
-Full documentation — user manual, architecture articles, and reference — lives under [`docs/`](docs/index.html) and is published as a GitHub Pages site.
+Full documentation — user manual, architecture articles, and reference — is published as a GitHub Pages site:
+
+**→ https://mightyowl4.github.io/starfield-toolkit/**
+
+The source lives under [`docs/`](docs/index.html) and includes:
 
 - **Manual** — tab-by-tab walkthrough of the UI
 - **Concepts** — how Auto-Sort works, what rule books are, the sorter priority pipeline, caching, Fast Lane baseline
 - **Reference** — file locations, glossary, FAQ, shipped-features index
-
-To host on GitHub Pages: Settings → Pages → Source = `main` branch, folder = `/docs`.
 
 **Local preview (Docker):**
 
@@ -52,55 +54,6 @@ docker compose up
 ```
 
 Then open http://localhost:4000/. The container runs Jekyll with the `github-pages` gem (same versions GitHub Pages serves), watches for file changes with polling (works on Windows/WSL), and live-reloads the browser on edit.
-
-# Tools
-
-## Installed Creations
-
-View all installed Bethesda Creations in their current load order. Features:
-
-### Check for Updates
-compares your installed versions against the Bethesda Creations API and highlights outdated entries
-
-<img src="assets/check_for_updates.png" width="500" />
-
-
-### Check Achievements
-flags any creations that will disable achievements when active
-
-<img src="assets/check-achievement-diabling.png" width="500" />
-
-### Export
-save your creation list as a markdown table or CSV, for sharing online
-
-### Auto-refresh
-watches your Plugins.txt and ContentCatalog.txt for changes and prompts you to reload
-
-
-## Load Order
-
-Manage your plugin load order with safety and confidence.
-
-### Drag-and-Drop Reordering
-Rearrange creations manually — changes are staged (highlighted) until you explicitly apply them. Plugins.txt is never written by accident.
-
-<img src="assets/load_order_drag.png" width="500" />
-
-### Auto Sort
-One-click sorting using a priority-based pipeline: category-based rules (11-tier community system) combined with LOOT masterlist data. When sorters disagree, the more authoritative source wins.
-
-### Review & Approve
-Git-merge-style diff view showing current vs proposed order side-by-side. Each moved item shows where it came from and which sorter decided the move (LOOT, CAT). Accept or ignore individual moves before applying.
-
-<img src="assets/load_order_diff.png" width="500" />
-
-### Snapshots
-Save and restore named load order configurations. Useful for switching between setups (e.g., achievement-friendly vs full mods) or as a backup before experimenting.
-
-### Safety Features
-- Starfield process detection — apply is blocked while the game is running
-- Multi-file creations (e.g., Trackers Alliance) are grouped and sorted as a pack
-- Bethesda official creations are always kept at the top
 
 # Project setup
 
