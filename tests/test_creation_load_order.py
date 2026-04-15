@@ -31,26 +31,19 @@ class TestBuildCreationList:
         positions = [c.load_position for c in creations if c.load_position is not None]
         assert positions == list(range(len(positions)))
 
-    def test_marks_missing_files(self):
+    def test_ghosts_and_disabled_are_hidden(self):
+        # CC01 (CreationClub01.esl) is both missing from Data/ and not active
+        # in Plugins.txt — it should be filtered out entirely, matching the
+        # in-game load-order screen which hides disabled/uninstalled entries.
         install = _make_install(FIXTURES)
         creations = build_creation_list(install)
-        cc01 = [c for c in creations if c.content_id == "CC01"][0]
-        # CreationClub01.esl does not exist in Data/
-        assert cc01.file_missing is True
+        assert "CC01" not in [c.content_id for c in creations]
 
-    def test_existing_files_not_marked_missing(self):
-        install = _make_install(FIXTURES)
-        creations = build_creation_list(install)
-        bgs007 = [c for c in creations if c.content_id == "SFBGS007"][0]
-        assert bgs007.file_missing is False
-
-    def test_active_status(self):
+    def test_active_installed_creation_included(self):
         install = _make_install(FIXTURES)
         creations = build_creation_list(install)
         bgs007 = [c for c in creations if c.content_id == "SFBGS007"][0]
         assert bgs007.is_active is True
-        cc01 = [c for c in creations if c.content_id == "CC01"][0]
-        assert cc01.is_active is False
 
     def test_empty_content_catalog(self, tmp_path):
         data_dir = tmp_path / "Data"

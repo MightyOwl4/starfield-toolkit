@@ -221,7 +221,6 @@ class CreationLoadOrderTool(ToolModule):
             frame, fg_color="transparent",
         )
 
-        self._tree.tag_configure("missing", foreground="#666666")
         self._tree.tag_configure(
             "has_update", background="#dba54b", foreground="#1a1a1a"
         )
@@ -345,9 +344,7 @@ class CreationLoadOrderTool(ToolModule):
             author_text = info.author if info and info.author else "n/a"
 
             tags = []
-            if creation.file_missing:
-                tags.append("missing")
-            elif self._checked and creation.has_update:
+            if self._checked and creation.has_update:
                 tags.append("has_update")
             elif self._achievements_checked and creation.achievement_friendly is False:
                 tags.append("not_achievement_friendly")

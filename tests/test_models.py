@@ -35,7 +35,6 @@ class TestCreation:
         c = Creation(content_id="abc", display_name="Test")
         assert c.available_version is None
         assert c.has_update is False
-        assert c.file_missing is False
         assert c.load_position is None
         assert c.plugin_files == []
 
