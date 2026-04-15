@@ -105,6 +105,14 @@ class CreationLoadOrderTool(ToolModule):
         )
         self._update_clear.bind("<Button-1>", lambda _e: self._clear_update_check())
 
+        self._update_show_list = ctk.CTkLabel(
+            top, text="show list", font=ctk.CTkFont(size=11, underline=True),
+            text_color="#6699cc", cursor="hand2",
+        )
+        self._update_show_list.bind(
+            "<Button-1>", lambda _e: self._show_updates_list()
+        )
+
         self._achiev_summary = ctk.CTkLabel(top, text="")
         self._achiev_summary.pack(side="left", padx=(8, 0))
 
@@ -357,9 +365,13 @@ class CreationLoadOrderTool(ToolModule):
             else:
                 date_text = ""
 
+            # Prefer freshly-fetched title from cache — ContentCatalog's
+            # Title is frozen at install time and goes stale when Bethesda
+            # renames a Creation.
+            name_text = info.title if info and info.title else creation.display_name
             self._tree.insert(
                 "", "end",
-                values=(pos, f"{creation.display_name}  \U0001F6C8", author_text, version_text, date_text),
+                values=(pos, f"{name_text}  \U0001F6C8", author_text, version_text, date_text),
                 tags=tuple(tags),
             )
 
@@ -423,6 +435,10 @@ class CreationLoadOrderTool(ToolModule):
         self._context.status_bar.clear_task()
         self._update_btn.configure(state="normal")
         self._update_clear.pack(side="left", padx=(4, 0))
+        if update_count > 0:
+            self._update_show_list.pack(side="left", padx=(4, 0))
+        else:
+            self._update_show_list.pack_forget()
 
     def _on_updates_failed(self):
         if self._update_summary:
@@ -438,9 +454,44 @@ class CreationLoadOrderTool(ToolModule):
         if self._update_summary:
             self._update_summary.configure(text="")
         self._update_clear.pack_forget()
+        self._update_show_list.pack_forget()
         self._populate_tree()
         if self._grid_mode == _GRID_MODE_MEDIA:
             self._populate_media()
+
+    def _show_updates_list(self):
+        def _fresh(c):
+            info = self._cached_info.get(c.content_id) if self._cached_info else None
+            return info.title if info and info.title else c.display_name
+        names = sorted(
+            (_fresh(c) for c in self._creations if c.has_update),
+            key=str.casefold,
+        )
+        body = "\n".join(names) if names else "(no updates)"
+
+        from starfield_tool.dialogs import center_dialog
+        dlg = ctk.CTkToplevel(self._tree)
+        dlg.title(f"Creations with updates ({len(names)})")
+        center_dialog(dlg, 480, 420)
+        dlg.minsize(320, 240)
+        dlg.attributes("-topmost", True)
+        dlg.after(100, lambda: dlg.attributes("-topmost", False))
+        from starfield_tool.app import _icon_path
+        icon = _icon_path()
+        if icon.exists():
+            dlg.after(200, lambda: dlg.iconbitmap(str(icon)))
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
+
+        ctk.CTkButton(
+            dlg, text="Close", width=90, command=dlg.destroy,
+        ).pack(side="bottom", pady=(4, 10))
+
+        textbox = ctk.CTkTextbox(
+            dlg, wrap="none", font=ctk.CTkFont(family="Consolas", size=12),
+        )
+        textbox.pack(fill="both", expand=True, padx=12, pady=(12, 4))
+        textbox.insert("1.0", body)
+        textbox.configure(state="disabled")
 
     def _check_achievements(self):
         if not self._context or not self._creations:
@@ -451,6 +502,7 @@ class CreationLoadOrderTool(ToolModule):
         if self._update_summary:
             self._update_summary.configure(text="")
         self._update_clear.pack_forget()
+        self._update_show_list.pack_forget()
         self._populate_tree()
 
         self._context.status_bar.set_task("Checking achievements...")
@@ -542,10 +594,48 @@ class CreationLoadOrderTool(ToolModule):
                     info.thumbnail_url, content_id=creation.content_id,
                 )
         from starfield_tool.dialogs.creation_details import CreationDetailsDialog
+        fresh_name = info.title if info and info.title else creation.display_name
         CreationDetailsDialog(
-            self._tree, creation.display_name, info, thumb,
+            self._tree, fresh_name, info, thumb,
             content_id=creation.content_id,
+            on_remove=self._make_remove_callback(creation),
         )
+
+    def _make_remove_callback(self, creation):
+        """Return a zero-arg callback that starts the Remove flow, or None
+        if the dangerous-ops setting is OFF."""
+        from starfield_tool.config import load_config
+        if not load_config().enable_dangerous_ops:
+            return None
+        return lambda: self._start_remove(creation)
+
+    def _start_remove(self, creation):
+        from starfield_tool.dialogs.remove_creation import (
+            RemoveConfirmDialog, RemoveResultDialog,
+        )
+        from starfield_tool.removal import plan_removal, execute_removal
+        import threading
+
+        install = self._context.game_installation
+        plan = plan_removal(creation, install.plugins_txt, install.data_dir)
+
+        def _on_confirm():
+            self._context.status_bar.set_task(
+                f"Removing {creation.display_name}..."
+            )
+
+            def _work():
+                result = execute_removal(plan, install.plugins_txt)
+                self._tree.after(0, lambda: _on_complete(result))
+
+            threading.Thread(target=_work, daemon=True).start()
+
+        def _on_complete(result):
+            self._context.status_bar.clear_task()
+            RemoveResultDialog(self._tree, result, creation.display_name)
+            self._refresh()
+
+        RemoveConfirmDialog(self._tree, plan, _on_confirm)
 
     def _get_selected_creation(self) -> Creation | None:
         """Return the creation currently selected in the active grid mode."""
@@ -770,6 +860,7 @@ class CreationLoadOrderTool(ToolModule):
         CreationDetailsDialog(
             self._media_frame, creation.display_name, info, thumb,
             content_id=creation.content_id,
+            on_remove=self._make_remove_callback(creation),
         )
 
     def _download_thumbnails(self):

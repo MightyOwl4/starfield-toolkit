@@ -348,6 +348,13 @@ class App(ctk.CTk):
         menu.add_command(label="Clear creations cache", command=self._settings_clear_cache)
         menu.add_command(label="Clear image cache", command=self._settings_clear_image_cache)
         menu.add_separator()
+        dangerous_on = load_config().enable_dangerous_ops
+        menu.add_checkbutton(
+            label="Enable dangerous operations",
+            command=self._settings_toggle_dangerous_ops,
+            variable=tk.BooleanVar(value=dangerous_on),
+        )
+        menu.add_separator()
         menu.add_command(label="About", command=self._settings_about)
         # Position below the button
         x = self._menu_btn.winfo_rootx()
@@ -375,6 +382,14 @@ class App(ctk.CTk):
         self._status_bar.set_game_path(str(install.game_root))
         self._status_bar.set_task("Game path updated — restart to reload modules")
         self.after(3000, self._status_bar.clear_task)
+
+    def _settings_toggle_dangerous_ops(self):
+        settings = load_config()
+        settings.enable_dangerous_ops = not settings.enable_dangerous_ops
+        save_config(settings)
+        state = "ON" if settings.enable_dangerous_ops else "OFF"
+        self._status_bar.set_task(f"Dangerous operations: {state}")
+        self.after(2000, self._status_bar.clear_task)
 
     def _settings_clear_cache(self):
         from starfield_tool.creations import clear_cache

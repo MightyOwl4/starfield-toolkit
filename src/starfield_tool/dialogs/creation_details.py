@@ -47,6 +47,7 @@ class CreationDetailsDialog(ctk.CTkToplevel):
         info: "CreationInfo | None",
         thumbnail_image: "PILImage.Image | None" = None,
         content_id: str = "",
+        on_remove=None,
     ):
         super().__init__(parent)
         self.title(f"Details — {display_name}")
@@ -65,6 +66,7 @@ class CreationDetailsDialog(ctk.CTkToplevel):
             self.after(200, lambda: self.iconbitmap(str(icon)))
 
         self._content_id = content_id
+        self._on_remove = on_remove
         self._build_ui(display_name, info, thumbnail_image)
 
         self.bind("<Escape>", lambda _e: self.destroy())
@@ -98,10 +100,22 @@ class CreationDetailsDialog(ctk.CTkToplevel):
     ) -> None:
         import html as _html
 
-        # Pack button first so it keeps its space when window shrinks
+        # Pack buttons first so they keep their space when window shrinks
+        button_row = ctk.CTkFrame(self, fg_color="transparent")
+        button_row.pack(side="bottom", pady=(4, 10))
         ctk.CTkButton(
-            self, text="Close", width=80, command=self.destroy,
-        ).pack(side="bottom", pady=(4, 10))
+            button_row, text="Close", width=80, command=self.destroy,
+        ).pack(side="left", padx=4)
+        if self._on_remove is not None:
+            def _invoke_remove():
+                cb = self._on_remove
+                self.destroy()
+                cb()
+            ctk.CTkButton(
+                button_row, text="Remove",
+                width=100, fg_color="#a33", hover_color="#c44",
+                command=_invoke_remove,
+            ).pack(side="left", padx=4)
 
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=12, pady=(8, 4))
