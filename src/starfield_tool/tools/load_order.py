@@ -291,8 +291,11 @@ class LoadOrderTool(ToolModule):
     # --- Apply / Discard ---
 
     def _is_starfield_running(self) -> bool:
-        from starfield_tool.game_process import is_starfield_running
-        return is_starfield_running()
+        # Covers Starfield.exe (Steam), Starfield_BGS.exe (Game Pass), and
+        # the Bethesda launcher — any of them holding files mapped is a reason
+        # not to touch Plugins.txt.
+        from starfield_tool.game_process import is_starfield_or_launcher_running
+        return is_starfield_or_launcher_running()
 
     def _apply(self):
         if not self._context or not self._dirty_items:
