@@ -138,12 +138,12 @@ def test_out_of_tree_entry(tmp_path):
         mtimes={"foo.esm": 1_000_000.0},
     )
     result = scan_broken(
-        [_cat("Esc", ["..\\evil.esm", "foo.esm"])],
+        [_cat("Esc", ["../evil.esm", "foo.esm"])],
         _plugin_entries(["*foo.esm"]), data_dir,
     )
     assert len(result) == 1
     assert "out_of_tree" in result[0].reasons
-    assert "..\\evil.esm" in result[0].files_missing
+    assert "../evil.esm" in result[0].files_missing
 
 
 def test_plugins_txt_missing_flags_every_esm_having(tmp_path):
