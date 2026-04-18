@@ -45,10 +45,11 @@ def test_plan_basic(tmp_path):
 
 def test_plan_rejects_out_of_tree(tmp_path):
     data_dir, plugins = _make_layout(tmp_path, {}, "")
+    # Use forward slashes so the escape works on both Windows and POSIX.
     plan = plan_removal(
-        _creation("Esc", ["..\\evil.esm", "foo.esm"]), plugins, data_dir
+        _creation("Esc", ["../evil.esm", "foo.esm"]), plugins, data_dir
     )
-    assert "..\\evil.esm" in plan.out_of_tree_files
+    assert "../evil.esm" in plan.out_of_tree_files
     # foo.esm stays accepted
     assert any(p.name == "foo.esm" for p in plan.files_to_delete)
 
