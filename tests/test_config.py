@@ -39,3 +39,22 @@ class TestSaveConfig:
         loaded = load_config(tmp_config)
         assert loaded.game_path == original.game_path
         assert loaded.window_geometry == original.window_geometry
+
+
+class TestDangerousOps:
+    def test_default_is_false(self):
+        assert AppSettings().enable_dangerous_ops is False
+
+    def test_round_trip(self, tmp_config):
+        save_config(AppSettings(enable_dangerous_ops=True), tmp_config)
+        assert load_config(tmp_config).enable_dangerous_ops is True
+
+        save_config(AppSettings(enable_dangerous_ops=False), tmp_config)
+        assert load_config(tmp_config).enable_dangerous_ops is False
+
+    def test_missing_field_reads_false(self, tmp_config):
+        tmp_config.parent.mkdir(parents=True, exist_ok=True)
+        tmp_config.write_text(
+            json.dumps({"game_path": "C:/Starfield"}), encoding="utf-8",
+        )
+        assert load_config(tmp_config).enable_dangerous_ops is False

@@ -50,7 +50,6 @@ class Creation:
     timestamp: datetime | None = None
     load_position: int | None = None
     is_active: bool = False
-    file_missing: bool = False
     available_version: str | None = None
     has_update: bool = False
     achievement_friendly: bool | None = None  # None = not checked yet

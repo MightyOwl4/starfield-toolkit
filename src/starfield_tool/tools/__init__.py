@@ -1,4 +1,5 @@
 from starfield_tool.base import ToolModule
+from starfield_tool.tools.broken_updates import BrokenUpdatesTool
 from starfield_tool.tools.creation_load_order import CreationLoadOrderTool
 from starfield_tool.tools.dependency_inspector import DependencyInspectorTool
 from starfield_tool.tools.fast_lane_check import FastLaneCheckTool
@@ -12,4 +13,5 @@ MODULES: list[type[ToolModule]] = [
     RuleBookTool,
     FastLaneCheckTool,
     DependencyInspectorTool,
+    BrokenUpdatesTool,
 ]

@@ -126,12 +126,18 @@ def build_creation_list(game_install: GameInstallation) -> list[Creation]:
                 is_active = plugin_index[pf].is_active
                 break
 
-        # Check if plugin files exist in Data dir
-        file_missing = False
-        for pf in plugin_files_esm:
-            if not (game_install.data_dir / pf).exists():
-                file_missing = True
-                break
+        # "Installed" = files present on disk AND (if esm-having) active in
+        # Plugins.txt. The game leaves ContentCatalog.txt entries behind after
+        # in-game deletion and strips the `*` active-marker on disable, so we
+        # mirror the game's load-order screen: ghosts and disabled creations
+        # are hidden entirely.
+        any_file_on_disk = any(
+            (game_install.data_dir / f).exists() for f in ce.files
+        ) if ce.files else False
+        if not any_file_on_disk:
+            continue
+        if plugin_files_esm and not is_active:
+            continue
 
         creations.append(Creation(
             content_id=ce.content_id,
@@ -142,7 +148,6 @@ def build_creation_list(game_install: GameInstallation) -> list[Creation]:
             timestamp=ce.timestamp,
             load_position=load_position,
             is_active=is_active,
-            file_missing=file_missing,
         ))
 
     # Sort by load position (None last), then re-number sequentially

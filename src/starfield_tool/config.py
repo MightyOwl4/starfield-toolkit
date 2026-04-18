@@ -16,6 +16,7 @@ class AppSettings:
     beta_acknowledged: bool = False
     rulebook_registry: list = None
     grid_font_size: int = 11  # Treeview body font size in pt
+    enable_dangerous_ops: bool = False
 
     def __post_init__(self):
         if self.rulebook_registry is None:
@@ -32,6 +33,7 @@ def load_config(path: Path | None = None) -> AppSettings:
             beta_acknowledged=data.get("beta_acknowledged", False),
             rulebook_registry=data.get("rulebook_registry", []),
             grid_font_size=data.get("grid_font_size", 11),
+            enable_dangerous_ops=data.get("enable_dangerous_ops", False),
         )
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return AppSettings()

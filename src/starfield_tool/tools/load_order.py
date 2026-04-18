@@ -1,5 +1,4 @@
 """Load Order tool — manage plugin load order with sorting and snapshots."""
-import subprocess
 import threading
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
@@ -292,14 +291,11 @@ class LoadOrderTool(ToolModule):
     # --- Apply / Discard ---
 
     def _is_starfield_running(self) -> bool:
-        try:
-            result = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq Starfield.exe", "/NH"],
-                capture_output=True, text=True, timeout=5,
-            )
-            return "Starfield.exe" in result.stdout
-        except (subprocess.SubprocessError, OSError):
-            return False
+        # Covers Starfield.exe (Steam), Starfield_BGS.exe (Game Pass), and
+        # the Bethesda launcher — any of them holding files mapped is a reason
+        # not to touch Plugins.txt.
+        from starfield_tool.game_process import is_starfield_or_launcher_running
+        return is_starfield_or_launcher_running()
 
     def _apply(self):
         if not self._context or not self._dirty_items:
