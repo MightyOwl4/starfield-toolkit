@@ -301,6 +301,9 @@ class CreationLoadOrderTool(ToolModule):
                 self._update_summary.configure(text="")
             if self._achiev_summary:
                 self._achiev_summary.configure(text="")
+            self._update_clear.pack_forget()
+            self._update_show_list.pack_forget()
+            self._achiev_clear.pack_forget()
             return
 
         for creation in self._creations:

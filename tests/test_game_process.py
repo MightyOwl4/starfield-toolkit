@@ -6,7 +6,7 @@ from starfield_tool import game_process
 
 def _fake_run(stdouts_by_image):
     """Return a fake subprocess.run that dispatches by IMAGENAME filter."""
-    def _run(cmd, capture_output, text, timeout):
+    def _run(cmd, **_kwargs):
         # cmd: ["tasklist", "/FI", f"IMAGENAME eq X", "/NH"]
         image = cmd[2].split("IMAGENAME eq ", 1)[1]
         stdout = stdouts_by_image.get(image, "")
